@@ -17,6 +17,7 @@ export type StageEvent =
   | { type: "resolution"; w: number; h: number; requested: number }
   | { type: "stats"; kbps: number; fps: number; w: number; h: number; rtt: number | null; loss: number }
   | { type: "chat"; text: string }
+  | { type: "react"; kind: string }
   | { type: "chatSent"; id: string }
   | { type: "chatError"; id: string };
 

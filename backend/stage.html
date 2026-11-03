@@ -245,6 +245,7 @@ function ridimensiona(){ renderer.setSize(canvas.clientWidth, canvas.clientHeigh
 
 function disegna(){
   if (demo) disegnaDemo(performance.now() / 1000);
+  animaReazioni();
   const w = canvas.clientWidth, h = canvas.clientHeight;
   if (moto && haDati) camera.quaternion.copy(qOff).multiply(qDev);
   else camera.rotation.set(pitch, yaw, 0, 'YXZ');
@@ -318,6 +319,7 @@ function avviaPeerVisore(){
     dc.on('data', d => {
       if (d && d.t === 'cancel' && canali[dc.peer] === dc) annullata(dc.peer);
       if (d && d.t === 'chat' && chiamataV && chiamataV.peer === dc.peer) send({ type:'chat', text: String(d.text || '').slice(0, 300) });
+      if (d && d.t === 'react' && chiamataV && chiamataV.peer === dc.peer) reazioneRicevuta(String(d.kind));
     });
     dc.on('close', () => { if (canali[dc.peer] !== dc) return; delete canali[dc.peer]; annullata(dc.peer); });
   });
@@ -492,6 +494,7 @@ handlers.call = async c => {
   canaleS.on('data', d => {
     if (d && d.t === 'decline') { stato('Chiamata rifiutata dal visore.'); fineS(); }
     if (d && d.t === 'chat' && chiamataS) send({ type:'chat', text: String(d.text || '').slice(0, 300) });
+    if (d && d.t === 'react' && chiamataS) reazioneRicevuta(String(d.kind));
   });
   chiamataS = peerS.call(PREFISSO + codice, streamLocale);
   stato('Squilla: attendi che risponda dal visore.');
@@ -527,6 +530,77 @@ function fineS(){
   send({ type:'ended' });
 }
 handlers.hangup = MODE === 'sender' ? () => { annullaS(); stato('Chiamata terminata.'); } : handlers.hangup;
+
+
+/* ---------- reazioni che fluttuano nella scena 3D ---------- */
+const REAZIONI = { heart: '\u2764\uFE0F', clap: '\uD83D\uDC4F', star: '\u2B50', like: '\uD83D\uDC4D', wow: '\uD83E\uDD29' };
+const texReazioni = {};
+let attive = [], ultimaReazione = 0, ultimoFrame = 0;
+function texReazione(kind){
+  if (texReazioni[kind]) return texReazioni[kind];
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const x = c.getContext('2d');
+  x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.font = '96px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
+  x.fillText(REAZIONI[kind], 64, 72);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  return (texReazioni[kind] = t);
+}
+const vDir = new THREE.Vector3(), vRight = new THREE.Vector3(), vUp = new THREE.Vector3(0, 1, 0);
+function lanciaReazione(kind){
+  if (MODE !== 'viewer' || !REAZIONI[kind] || attive.length > 40) return;
+  camera.getWorldDirection(vDir);
+  const w = canvas.clientWidth / (vista === 'split' ? 2 : 1), h = canvas.clientHeight || 1;
+  const hfov = 2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) * (w / h));
+  const yawRnd = (Math.random() - 0.5) * Math.min(0.6, hfov * 0.5);
+  vDir.applyAxisAngle(vUp, yawRnd).normalize();
+  vRight.crossVectors(vDir, vUp).normalize();
+  const dist = 3, base = vDir.clone().multiplyScalar(dist).add(new THREE.Vector3(0, -0.6 + Math.random() * 0.3, 0));
+  const disp = 0.09; // differenza tra occhi: la reazione appare davanti al video
+  const coppia = [];
+  for (const [layer, segno] of [[1, -1], [2, 1]]) {
+    const m = new THREE.SpriteMaterial({ map: texReazione(kind), transparent: true, depthTest: false });
+    const sp = new THREE.Sprite(m);
+    sp.scale.set(0.45, 0.45, 1); sp.renderOrder = 10;
+    sp.layers.set(layer);
+    sp.position.copy(base).addScaledVector(vRight, segno * disp / 2);
+    scena.add(sp); coppia.push(sp);
+  }
+  attive.push({ coppia, nato: performance.now(), deriva: (Math.random() - 0.5) * 0.25, right: vRight.clone() });
+}
+function animaReazioni(){
+  const ora = performance.now();
+  const dt = ultimoFrame ? Math.min(0.1, (ora - ultimoFrame) / 1000) : 1 / 60;
+  ultimoFrame = ora;
+  if (!attive.length) return;
+  attive = attive.filter(r => {
+    const t = (ora - r.nato) / 1000;
+    if (t > 3) { r.coppia.forEach(sp => { scena.remove(sp); sp.material.dispose(); }); return false; }
+    for (const sp of r.coppia) {
+      sp.position.y += 0.72 * dt;
+      sp.position.addScaledVector(r.right, (Math.sin(t * 3) * 0.12 + r.deriva * 0.24) * dt);
+      sp.material.opacity = t < 2 ? 1 : 1 - (t - 2);
+      const k = 0.45 * (t < 0.25 ? 0.4 + t * 2.4 : 1);
+      sp.scale.set(k, k, 1);
+    }
+    return true;
+  });
+}
+handlers.react = c => {
+  const kind = String(c.kind || '');
+  if (!REAZIONI[kind]) return;
+  const ora = performance.now();
+  if (ora - ultimaReazione < 200) return;
+  ultimaReazione = ora;
+  const dc = MODE === 'sender' ? (chiamataS ? canaleS : null) : (chiamataV ? canali[chiamataV.peer] : null);
+  if (dc && dc.open) { try { dc.send({ t:'react', kind }); } catch {} }
+  lanciaReazione(kind);
+};
+function reazioneRicevuta(kind){
+  if (!REAZIONI[kind]) return;
+  lanciaReazione(kind);
+  send({ type:'react', kind });
+}
 
 /* ---------- chat durante la chiamata ---------- */
 handlers.chat = c => {

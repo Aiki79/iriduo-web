@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { StageView } from "@/src/components/StageView";
 import { ChatComposer, ChatPanel, ChatToasts, newMessage, type ChatMessage } from "@/src/components/CallChat";
+import { ReactionBar } from "@/src/components/Reactions";
 import { CallPill, CallStatsCard, quality, type CallStatsData } from "@/src/components/CallStats";
 import { addCall, topQuality } from "@/src/history";
 import { ShareCode } from "@/src/components/ShareCode";
@@ -59,6 +60,7 @@ export default function Viewer() {
   const [testing, setTesting] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [composerOpen, setComposerOpen] = useState(false);
+  const lastBuzzRef = useRef(0);
   const codeRef = useRef<string>("");
   const callRef = useRef<{ at: number; counts: Record<string, number> } | null>(null);
   const incomingRef = useRef(false);
@@ -74,6 +76,8 @@ export default function Viewer() {
     },
     [send],
   );
+
+  const react = useCallback((kind: string) => send({ type: "react", kind }), [send]);
 
   const onEvent = useCallback(
     (e: StageEvent) => {
@@ -118,6 +122,12 @@ export default function Viewer() {
         case "chat":
           setMessages((a) => [...a, newMessage("them", e.text)]);
           if (!isWeb) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          break;
+        case "react":
+          if (!isWeb && Date.now() - lastBuzzRef.current > 600) {
+            lastBuzzRef.current = Date.now();
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          }
           break;
         case "chatError":
           setMessages((a) => a.map((m) => (m.id === e.id ? { ...m, failed: true } : m)));
@@ -257,7 +267,14 @@ export default function Viewer() {
         testID="viewer-stage-container"
       >
         <StageView ref={stage} mode="viewer" onEvent={onEvent} testID="viewer-stage" />
-        {phase === "connected" && !composerOpen ? <ChatToasts messages={messages} split={full && view === "split"} testID="viewer-chat-toasts" /> : null}
+        {phase === "connected" && !composerOpen ? (
+          <ChatToasts messages={messages} split={full && view === "split"} bottom={full ? Math.max(insets.bottom, spacing.md) + 64 : undefined} testID="viewer-chat-toasts" />
+        ) : null}
+        {full && phase === "connected" && !composerOpen ? (
+          <View style={[styles.fullReactions, { bottom: Math.max(insets.bottom, spacing.md) }]}>
+            <ReactionBar compact onReact={react} testID="viewer-fullscreen-reactions" />
+          </View>
+        ) : null}
         {full ? (
           <View style={[styles.fullBar, { top: Math.max(insets.top, spacing.md), left: Math.max(insets.left, spacing.md), right: Math.max(insets.right, spacing.md) }]}>
             <IconBtn icon="minimize-2" label="Esci da schermo intero" testID="viewer-exit-fullscreen-button" onPress={() => setFull(false)} />
@@ -313,6 +330,12 @@ export default function Viewer() {
           {startedAt && phase === "connected" ? (
             <View style={styles.mt}>
               <CallStatsCard startedAt={startedAt} stats={stats} direction="in" testID="viewer-call-stats" />
+            </View>
+          ) : null}
+          {phase === "connected" ? (
+            <View style={styles.mt}>
+              <Label>Reazioni nella scena 3D</Label>
+              <ReactionBar onReact={react} testID="viewer-reactions" />
             </View>
           ) : null}
           {phase === "connected" ? <ChatPanel messages={messages} onSend={sendChat} testID="viewer-chat" /> : null}
@@ -409,6 +432,7 @@ const styles = StyleSheet.create({
   stageBtn: { position: "absolute", top: spacing.sm, right: spacing.sm },
   fullBar: { position: "absolute", flexDirection: "row", justifyContent: "space-between", alignItems: "center", opacity: 0.85 },
   fullComposer: { position: "absolute" },
+  fullReactions: { position: "absolute", left: 0, right: 0, alignItems: "center" },
   fullComposerInner: { backgroundColor: colors.scrim, borderRadius: radius.md, padding: spacing.sm, gap: spacing.xs },
   fullMsg: { fontFamily: fonts.regular, fontSize: 14, color: colors.onSurface },
   fullMsgMe: { color: colors.brandPrimary },

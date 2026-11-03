@@ -14,6 +14,7 @@
 - Native: expo-sensors DeviceMotion for looking around, expo-screen-orientation for landscape fullscreen, expo-camera permissions, recent codes stored locally
 
 ## Implemented (2026-06)
+- Quick reactions (heart, applause, star, like, wow): sprites in the viewer's 3D scene (per-eye disparity, offset scaled to the field of view, frame-rate independent) and floaters on the sender's preview; 200ms rate limit on both sides
 - Chat during calls over the PeerJS data connection: quick replies + text, chat panel (viewer and sender), toasts over the video (doubled in split view), message box in fullscreen
 - Call history (/history, local storage): incoming/outgoing, duration, average quality, result, Richiama (auto-call), clear
 - Auto call from link/Richiama once the camera is ready (only once)

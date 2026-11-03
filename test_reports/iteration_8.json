@@ -1,0 +1,33 @@
+{
+  "summary": "Tested the 'Reazioni Rapide' feature end-to-end over 6 Playwright runs. Each run used two pages in a chromium launched with fake media (375x667) and a call connected through the sender?code= auto-call. All requested flows work. (1) The viewer-reactions and sender-reactions bars are absent before the call and appear once connected; all 5 buttons are 52x52. (2) Viewer heart -> attive.length=1 with 2 sprites (one per eye, layers masks 2,4). The stage screenshot shows a red heart emoji before/after (color emoji fonts are available in headless chromium). Sender-floating-reactions appeared and was gone after 3s; the viewer sprite was removed after about 3s. (3) Sender star -> local floater rising over the preview (screenshots at 0.1s and 0.6s show the heart icon moving up, opacity 0.3 at 1.5s) and sprite in the viewer stage. The sender stage itself spawns no sprites (attive=0), as intended. (4) Fullscreen: viewer-fullscreen-reactions sits at the bottom (44x44 buttons). Clap sprite rendered and the sender received it. The bar is hidden while viewer-chat-fullscreen-button has the composer open and comes back when it closes. Split view: the sprite appears in both halves (portrait: star in both eyes; landscape 667x375: heart in both halves). (5) Rate limit: 15 rapid viewer taps produced 6 sprites, 30 rapid fullscreen taps produced 5, with no errors and no pageerror. All sprites were cleaned up after 3.5s (scene sprites=0) and rendering continued. (6) Bars are hidden after hangup on both sides, whether the viewer (viewer-hangup-fullscreen-button) or the sender (sender-hangup-button) ends the call. (7) Regression passed: stats cards on both sides, quick reply viewer->sender, typed message sender->viewer, chat toast together with a floater. Found 1 functional inconsistency on the sender (local floaters for reactions that were throttled) and 1 minor visual issue (sprites clipped in portrait split view).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Sender local floaters vs 200ms rate limit", "issue": "sender.tsx react() always calls addFloater(kind), but stage.html handlers.react drops taps within 200ms of the last one, so they are never sent. Measured: 15 rapid sender taps gave 15 local floaters on the sender, but only 4 sprites reached the viewer. The sender sees reactions the viewer never got. Reference: /app/frontend/app/sender.tsx:128-134, /app/backend/stage.html:581-591", "testID": "sender-reactions-like", "priority": "MEDIUM"},
+      {"component": "3D sprite placement in portrait split view", "issue": "lanciaReazione uses a random yaw of ±0.3 rad. In split view in portrait, each eye has aspect 0.28 with fov 85, so the horizontal half-FOV is only ~0.25 rad. Sampling 40 spawns: 18/40 sprites were partly cut off by the per-eye scissor (a half star was visible at the eye edge in a screenshot). Landscape split: 0/40 clipped. Fix: scale yaw randomness by the current horizontal FOV. Reference: /app/backend/stage.html:553-555", "testID": "viewer-fullscreen-reactions", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Viewer vs Sender reaction visuals", "issues": ["The viewer 3D scene shows system emoji (👏, 🤩) while the bars and the sender floaters use MDI icons (hand-clap, emoticon-excited). The 'wow' kind looks clearly different on each side; consider matching them."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/.screenshots/r_before.jpg", "/app/.screenshots/r_after.jpg", "/app/.screenshots/r_sfl_0.1.jpg", "/app/.screenshots/r_sfl_0.6.jpg", "/app/.screenshots/r_fs_clap.jpg", "/app/.screenshots/r_split_after.png", "/app/.screenshots/r_land_split2.jpg", "/app/.screenshots/r_s_toast_floater.jpg", "/app/.screenshots/r_after_hangup.jpg"],
+  "action_items": [
+    "Sender: show the local floater only when the reaction is actually sent. Either apply the same 200ms throttle in sender.tsx react() before addFloater, or have stage.html emit a 'reactSent' event that the RN side uses to add the floater.",
+    "stage.html lanciaReazione: limit yawRnd to about 0.6 * the horizontal half-FOV (computed from camera.fov/aspect in split mode) so that sprites never get clipped at the eye edge in portrait split / narrow viewports.",
+    "Optional: make sprite rise/drift frame-rate independent (use a dt based on performance.now) and add a receive-side throttle in reazioneRicevuta so that remote floods don't trigger haptics on every message."
+  ],
+  "critical_code_review_comments": [
+    "animaReazioni moves sprites by a fixed 0.012 per frame, so the rise speed depends on the frame rate (on 120Hz devices sprites rise twice as fast as at 60Hz).",
+    "reazioneRicevuta has no throttle. It is capped at 40 active sprites (viewer) and 21 floaters (sender), but the viewer onEvent 'react' fires a haptic for every received message.",
+    "Reaction textures are cached per kind and materials are disposed on removal: no leak observed (scene sprites back to 0 after the bursts)."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (frontend only)", "frontend": "95% - all requested flows pass; 1 medium inconsistency (sender floaters while throttled) and 1 low visual issue (clipping in portrait split)"},
+  "seed_data_creation": "None. Only ephemeral peer calls, plus a chat message 'TEST_ciao' that was never persisted.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Use page.context.browser.browser_type.launch(args=['--use-fake-device-for-media-stream','--use-fake-ui-for-media-stream']) inside browser_automation. sender?code=<code> auto-calls (do not click sender-call-button). The stage iframe is the frame whose url contains '/api/stage'. Classic-script globals are reachable via frame.evaluate: attive (active reactions, each with coppia=2 sprites), scena, camera, vista ('split'/'drag'), lanciaReazione(kind), ultimaReazione. Chat quick replies use the testID {viewer|sender}-chat-composer-quick-N. Reaction testIDs: viewer-reactions-*, viewer-fullscreen-reactions-*, sender-reactions-*, sender-floating-reactions.",
+  "rca_of_issue": "Sender floater mismatch: the RN layer adds the floater unconditionally, while throttling happens later inside the WebView/iframe (handlers.react: ora - ultimaReazione < 200 -> return) and is never reported back to RN."
+}

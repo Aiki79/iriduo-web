@@ -95,7 +95,7 @@ export function ChatPanel({ messages, onSend, testID }: { messages: ChatMessage[
 }
 
 /** Incoming messages floating over the video for a few seconds. In split mode they appear in both eyes. */
-export function ChatToasts({ messages, split, testID }: { messages: ChatMessage[]; split?: boolean; testID: string }) {
+export function ChatToasts({ messages, split, testID, bottom }: { messages: ChatMessage[]; split?: boolean; testID: string; bottom?: number }) {
   const [now, setNow] = useState(Date.now());
   const recent = messages.filter((m) => m.from === "them" && now - m.at < 8000).slice(-2);
   useEffect(() => {
@@ -118,7 +118,7 @@ export function ChatToasts({ messages, split, testID }: { messages: ChatMessage[
     </View>
   );
   return (
-    <View pointerEvents="none" style={styles.toasts} testID={testID}>
+    <View pointerEvents="none" style={[styles.toasts, bottom !== undefined && { bottom }]} testID={testID}>
       {split ? [stack("l"), stack("r")] : stack("c")}
     </View>
   );

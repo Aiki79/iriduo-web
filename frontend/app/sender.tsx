@@ -8,6 +8,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { StageView } from "@/src/components/StageView";
 import { ChatPanel, ChatToasts, newMessage, type ChatMessage } from "@/src/components/CallChat";
+import { FloatingReactions, newReaction, ReactionBar, type FloatingReaction } from "@/src/components/Reactions";
+import * as Haptics from "expo-haptics";
 import { CallPill, CallStatsCard, quality, type CallStatsData } from "@/src/components/CallStats";
 import { addCall, topQuality, type CallResult } from "@/src/history";
 import type { Device, StageEvent, StageHandle } from "@/src/components/stage-types";
@@ -120,6 +122,21 @@ function SenderBody() {
     setMessages((a) => [...a, m]);
     stage.current?.send({ type: "chat", text, id: m.id });
   }, []);
+  const [floaters, setFloaters] = useState<FloatingReaction[]>([]);
+  const removeFloater = useCallback((id: string) => setFloaters((a) => a.filter((f) => f.id !== id)), []);
+  const addFloater = useCallback((kind: string) => setFloaters((a) => (a.length > 20 ? a : [...a, newReaction(kind)])), []);
+  const lastReactRef = useRef(0);
+  const lastBuzzRef = useRef(0);
+  const react = useCallback(
+    (kind: string) => {
+      const now = Date.now();
+      if (now - lastReactRef.current < 220) return; // same limit as the stage
+      lastReactRef.current = now;
+      stage.current?.send({ type: "react", kind });
+      addFloater(kind);
+    },
+    [addFloater],
+  );
 
   useEffect(() => {
     getRecentCodes().then(setRecent);
@@ -232,6 +249,13 @@ function SenderBody() {
         case "chat":
           setMessages((a) => [...a, newMessage("them", e.text)]);
           break;
+        case "react":
+          addFloater(e.kind);
+          if (Platform.OS !== "web" && Date.now() - lastBuzzRef.current > 600) {
+            lastBuzzRef.current = Date.now();
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          }
+          break;
         case "chatError":
           setMessages((a) => a.map((m) => (m.id === e.id ? { ...m, failed: true } : m)));
           break;
@@ -261,7 +285,7 @@ function SenderBody() {
           break;
       }
     },
-    [sendConfig],
+    [sendConfig, addFloater],
   );
 
   const valid = /^\d{6}$/.test(code);
@@ -283,6 +307,7 @@ function SenderBody() {
       <View style={styles.preview} testID="sender-preview-container">
         <StageView ref={stage} mode="sender" onEvent={onEvent} testID="sender-preview" />
         {phase === "live" ? <ChatToasts messages={messages} testID="sender-chat-toasts" /> : null}
+        {phase === "live" ? <FloatingReactions items={floaters} onDone={removeFloater} testID="sender-floating-reactions" /> : null}
         {phase === "live" && (
           <View style={styles.liveBadge} testID="sender-live-badge">
             <View style={styles.liveDot} />
@@ -321,6 +346,12 @@ function SenderBody() {
               tone="warning"
               text={`Qualità automatica: invio ridotto a ${effBitrate / 1e6} Mbit/s per la connessione debole. Risalirà da sola quando migliora.`}
             />
+          </View>
+        ) : null}
+        {phase === "live" ? (
+          <View style={styles.statsWrap}>
+            <Label>Reazioni</Label>
+            <ReactionBar onReact={react} testID="sender-reactions" />
           </View>
         ) : null}
         {phase === "live" ? <ChatPanel messages={messages} onSend={sendChat} testID="sender-chat" /> : null}
