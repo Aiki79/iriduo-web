@@ -49,11 +49,54 @@ addEventListener('message', e => {
 const stato = t => send({ type:'status', text:t });
 const hint = (t) => { $('hint').hidden = !t; if (t) $('hint').textContent = t; };
 
+/* =================== STATISTICHE =================== */
+let timerStats = null;
+function avviaStats(pc, verso){
+  fermaStats();
+  let prec = null;
+  const mio = setInterval(async () => {
+    if (!pc || pc.connectionState === 'closed') return;
+    let rep; try { rep = await pc.getStats(); } catch { return; }
+    if (timerStats !== mio) return;
+    let bytes = 0, fps = 0, w = 0, h = 0, persi = 0, pacchetti = 0, rtt = null, frazione = null;
+    rep.forEach(r => {
+      if (r.kind !== 'video' && r.type !== 'candidate-pair') return;
+      if (verso === 'in' && r.type === 'inbound-rtp') {
+        bytes = r.bytesReceived || 0; fps = r.framesPerSecond || 0; w = r.frameWidth || 0; h = r.frameHeight || 0;
+        persi = r.packetsLost || 0; pacchetti = r.packetsReceived || 0;
+      }
+      if (verso === 'out' && r.type === 'outbound-rtp') {
+        bytes = r.bytesSent || 0; fps = r.framesPerSecond || 0; w = r.frameWidth || 0; h = r.frameHeight || 0;
+      }
+      if (verso === 'out' && r.type === 'remote-inbound-rtp') {
+        if (typeof r.fractionLost === 'number') frazione = r.fractionLost;
+        if (typeof r.roundTripTime === 'number') rtt = r.roundTripTime;
+      }
+      if (r.type === 'candidate-pair' && r.nominated && r.state === 'succeeded' && typeof r.currentRoundTripTime === 'number') rtt = r.currentRoundTripTime;
+    });
+    const ora = performance.now();
+    let kbps = 0, perdita = frazione !== null ? frazione * 100 : 0;
+    if (prec) {
+      const dt = (ora - prec.t) / 1000;
+      if (dt > 0) kbps = Math.max(0, (bytes - prec.bytes) * 8 / 1000 / dt);
+      if (verso === 'in') {
+        const dp = (persi - prec.persi), dr = (pacchetti - prec.pacchetti);
+        perdita = dp + dr > 0 ? Math.max(0, dp) / (dp + dr) * 100 : 0;
+      }
+      send({ type:'stats', kbps: Math.round(kbps), fps: Math.round(fps), w, h, rtt: rtt === null ? null : Math.round(rtt * 1000), loss: Math.round(perdita * 10) / 10 });
+    }
+    prec = { t: ora, bytes, persi, pacchetti };
+  }, 2000);
+  timerStats = mio;
+}
+function fermaStats(){ clearInterval(timerStats); timerStats = null; }
+
 /* =================== VISORE =================== */
 let renderer, scena, camera, video, texture, mesh = [], canvas;
 let formato = 'sbs', scambia = false, vista = 'drag', moto = false, yaw = 0, pitch = 0;
 let peerV, attesa = null, chiamataV = null, micV = null;
 const canali = {};
+const rifiutiInSospeso = new Set();
 const qDev = new THREE.Quaternion(), qOff = new THREE.Quaternion();
 let haOff = false, haDati = false, mediaAttivo = false;
 const mostraMedia = on => { mediaAttivo = on; mesh.forEach(m => m.visible = on); };
@@ -168,8 +211,11 @@ function avviaPeerVisore(){
   peerV.on('disconnected', () => { if (!peerV.destroyed) peerV.reconnect(); });
   peerV.on('connection', dc => {
     canali[dc.peer] = dc;
-    dc.on('data', d => { if (d && d.t === 'cancel') annullata(dc.peer); });
-    dc.on('close', () => { if (canali[dc.peer] === dc) delete canali[dc.peer]; annullata(dc.peer); });
+    dc.on('open', () => {
+      if (rifiutiInSospeso.has(dc.peer)) { rifiutiInSospeso.delete(dc.peer); try { dc.send({ t:'decline' }); } catch {} }
+    });
+    dc.on('data', d => { if (d && d.t === 'cancel' && canali[dc.peer] === dc) annullata(dc.peer); });
+    dc.on('close', () => { if (canali[dc.peer] !== dc) return; delete canali[dc.peer]; annullata(dc.peer); });
   });
   peerV.on('call', c => {
     if (chiamataV || attesa) { c.close(); return; }
@@ -196,7 +242,7 @@ handlers.answer = async () => {
   const pcV = c.peerConnection;
   if (pcV) pcV.addEventListener('connectionstatechange', () => {
     if (chiamataV !== c) return;
-    if (pcV.connectionState === 'connected') { send({ type:'connected' }); stato('Collegato: sei in chiamata 3D.'); }
+    if (pcV.connectionState === 'connected') { send({ type:'connected' }); stato('Collegato: sei in chiamata 3D.'); avviaStats(pcV, 'in'); }
     if (pcV.connectionState === 'failed' || pcV.connectionState === 'closed') chiudiV();
   });
   c.on('stream', s => {
@@ -209,6 +255,7 @@ handlers.answer = async () => {
 };
 
 function chiudiV(){
+  fermaStats();
   const c = chiamataV; chiamataV = null;
   if (c) c.close();
   if (micV) micV.getTracks().forEach(t => t.stop());
@@ -221,7 +268,11 @@ function chiudiV(){
 }
 handlers.hangup = () => { if (chiamataV) chiudiV(); };
 handlers.decline = () => {
-  if (attesa) { const dc = canali[attesa.peer]; if (dc && dc.open) dc.send({ t:'decline' }); attesa.close(); attesa = null; }
+  if (attesa) {
+    const dc = canali[attesa.peer];
+    if (dc && dc.open) dc.send({ t:'decline' }); else { const pr = attesa.peer; rifiutiInSospeso.add(pr); setTimeout(() => rifiutiInSospeso.delete(pr), 5000); }
+    attesa.close(); attesa = null;
+  }
   send({ type:'ended' }); stato('Chiamata rifiutata. In attesa di chiamata.'); };
 
 $('fileProva').onchange = e => {
@@ -331,6 +382,7 @@ handlers.call = async c => {
     if (pc.connectionState === 'connected') {
       clearTimeout(timerSquillo);
       impostaBitrate(pc, Number(cfg.bitrate));
+      avviaStats(pc, 'out');
       send({ type:'connected' });
       stato('Collegato: sei in onda in 3D.');
     }
@@ -346,6 +398,7 @@ function annullaS(){
   fineS();
 }
 function fineS(){
+  fermaStats();
   clearTimeout(timerSquillo);
   const c = chiamataS; chiamataS = null;
   if (c) c.close();

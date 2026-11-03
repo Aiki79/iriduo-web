@@ -7,6 +7,7 @@ import { KeyboardAwareScrollView, KeyboardStickyView } from "react-native-keyboa
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { StageView } from "@/src/components/StageView";
+import { CallPill, CallStatsCard, type CallStatsData } from "@/src/components/CallStats";
 import type { Device, StageEvent, StageHandle } from "@/src/components/stage-types";
 import { Btn, Chip, ChipRow, Header, Label, StatusBox } from "@/src/components/ui";
 import { addRecentCode, getRecentCodes } from "@/src/recent";
@@ -99,6 +100,8 @@ function SenderBody() {
   const [status, setStatus] = useState("Avvio della camera…");
   const [tone, setTone] = useState<"info" | "error" | "success">("info");
   const [resText, setResText] = useState("");
+  const [startedAt, setStartedAt] = useState<number | null>(null);
+  const [stats, setStats] = useState<CallStatsData | null>(null);
 
   useEffect(() => {
     getRecentCodes().then(setRecent);
@@ -150,12 +153,20 @@ function SenderBody() {
           break;
         case "calling":
           setPhase("calling");
+          setStartedAt(null);
+          setStats(null);
           break;
         case "connected":
           setPhase("live");
+          setStartedAt((t) => t ?? Date.now());
           break;
         case "ended":
           setPhase("idle");
+          setStartedAt(null);
+          setStats(null);
+          break;
+        case "stats":
+          setStats(e);
           break;
       }
     },
@@ -185,6 +196,11 @@ function SenderBody() {
             <Text style={styles.liveText}>IN ONDA</Text>
           </View>
         )}
+        {phase === "live" && startedAt ? (
+          <View style={styles.pillPos}>
+            <CallPill startedAt={startedAt} stats={stats} testID="sender-call-pill" />
+          </View>
+        ) : null}
       </View>
       {resText ? (
         <Text style={styles.resText} testID="sender-resolution-text">
@@ -200,6 +216,11 @@ function SenderBody() {
         testID="sender-form"
       >
         <StatusBox testID="sender-status" text={status} tone={tone} />
+        {phase === "live" && startedAt ? (
+          <View style={styles.statsWrap}>
+            <CallStatsCard startedAt={startedAt} stats={stats} direction="out" testID="sender-call-stats" />
+          </View>
+        ) : null}
 
         <Label>Codice mostrato sul visore</Label>
         <TextInput
@@ -291,6 +312,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
+  pillPos: { position: "absolute", top: spacing.sm, right: spacing.sm },
+  statsWrap: { marginTop: spacing.sm },
   liveBadge: {
     position: "absolute",
     top: spacing.sm,

@@ -14,7 +14,8 @@ export type StageEvent =
   | { type: "ended" }
   | { type: "test"; name: string }
   | { type: "devices"; cams: Device[]; mics: Device[]; cam: string; mic: string }
-  | { type: "resolution"; w: number; h: number; requested: number };
+  | { type: "resolution"; w: number; h: number; requested: number }
+  | { type: "stats"; kbps: number; fps: number; w: number; h: number; rtt: number | null; loss: number };
 
 export type StageHandle = { send: (c: StageCmd) => void; reload: () => void };
 

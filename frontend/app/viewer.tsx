@@ -10,6 +10,7 @@ import Animated, { FadeIn, useAnimatedStyle, useSharedValue, withRepeat, withTim
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { StageView } from "@/src/components/StageView";
+import { CallPill, CallStatsCard, type CallStatsData } from "@/src/components/CallStats";
 import { ShareCode } from "@/src/components/ShareCode";
 import type { StageEvent, StageHandle } from "@/src/components/stage-types";
 import { Btn, Chip, ChipRow, Header, IconBtn, Label, StatusBox, Toggle } from "@/src/components/ui";
@@ -45,6 +46,8 @@ export default function Viewer() {
   const [full, setFull] = useState(false);
   const [testOpen, setTestOpen] = useState(false);
   const [micPerm, requestMic] = useMicrophonePermissions();
+  const [startedAt, setStartedAt] = useState<number | null>(null);
+  const [stats, setStats] = useState<CallStatsData | null>(null);
 
   const send = useCallback((c: { type: string; [k: string]: unknown }) => stage.current?.send(c), []);
 
@@ -70,14 +73,23 @@ export default function Viewer() {
           break;
         case "incoming":
           setPhase("incoming");
+          setStartedAt(null);
+          setStats(null);
           if (!isWeb) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           break;
         case "connected":
           setPhase("connected");
           setTestOpen(false);
+          setStartedAt((t) => t ?? Date.now());
           break;
         case "ended":
           setPhase("waiting");
+          setFull(false);
+          setStartedAt(null);
+          setStats(null);
+          break;
+        case "stats":
+          setStats(e);
           break;
         case "test":
           setTestOpen(false);
@@ -188,6 +200,7 @@ export default function Viewer() {
         {full ? (
           <View style={[styles.fullBar, { top: Math.max(insets.top, spacing.md), left: Math.max(insets.left, spacing.md), right: Math.max(insets.right, spacing.md) }]}>
             <IconBtn icon="minimize-2" label="Esci da schermo intero" testID="viewer-exit-fullscreen-button" onPress={() => setFull(false)} />
+            {startedAt && phase === "connected" ? <CallPill startedAt={startedAt} stats={stats} testID="viewer-call-pill" /> : null}
             <View style={styles.row}>
               {motion && <IconBtn icon="crosshair" label="Ricentra" testID="viewer-recenter-fullscreen-button" onPress={() => send({ type: "recenter" })} />}
               {inCall && (
@@ -207,6 +220,11 @@ export default function Viewer() {
           {inCall && (
             <Btn testID="viewer-hangup-button" label="Chiudi chiamata" icon="phone-off" variant="danger" onPress={() => send({ type: "hangup" })} style={styles.mt} />
           )}
+          {startedAt && phase === "connected" ? (
+            <View style={styles.mt}>
+              <CallStatsCard startedAt={startedAt} stats={stats} direction="in" testID="viewer-call-stats" />
+            </View>
+          ) : null}
 
           <Label>Come guardare</Label>
           <ChipRow testID="viewer-view-chips">
@@ -283,7 +301,7 @@ const styles = StyleSheet.create({
   },
   stageFull: { flex: 1, backgroundColor: colors.stage },
   stageBtn: { position: "absolute", top: spacing.sm, right: spacing.sm },
-  fullBar: { position: "absolute", flexDirection: "row", justifyContent: "space-between", opacity: 0.8 },
+  fullBar: { position: "absolute", flexDirection: "row", justifyContent: "space-between", alignItems: "center", opacity: 0.85 },
   controls: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
   tip: {
     flexDirection: "row",

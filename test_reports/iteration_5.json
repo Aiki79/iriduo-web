@@ -1,0 +1,29 @@
+{
+  "summary": "Retested the iteration_4 fixes with two pages in one chromium using fake media (375x667, /viewer and /sender), across 2 runs and 12 calls. All fixes PASS. HIGH decline race FIXED: on 3 consecutive calls (call 1 answered and hung up, calls 2 and 3 declined the moment Rifiuta appeared) the sender showed 'Chiamata rifiutata dal visore.' and sender-call-button within 0.3s. Also PASS: an immediate decline on the first call, a fast re-call within about 1s of a decline (the old data channel's late close no longer cancels the new incoming call, so the stale close guard works), and an immediate decline right after an answered call. Fullscreen exit PASS: when the sender hangs up and when viewer-hangup-fullscreen-button is tapped, the viewer leaves fullscreen within 0.3s (viewer-code visible, exit button gone). Quality stable: 20 samples over 20s on both sides went Misuro… (0-3s) then Buona all the way, with fps 19-20 and no Media flicker. The timer starts at 00:00 with 'Misuro…' on every new call (after declines, after a cancel and after a hangup). Stats card and pill are hidden before the call and while ringing, and removed after hangup. Regressions PASS: sender cancel while ringing clears viewer-incoming at once ('Chiamata annullata da chi chiamava.'); answer then hangup from the viewer and from the sender ends the call on both sides.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "viewer (375x667)", "issues": ["Carried over from iteration_4 and acceptable: the stats card sits below the hangup button and is only partly visible until the controls ScrollView is scrolled."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/.screenshots/i5_viewer_after_fs_hangup.jpg", "/app/.screenshots/i5_sender_after_decline.jpg", "/app/.screenshots/i5_viewer_stats.jpg"],
+  "action_items": [
+    "LOW (optional hardening): in stage.html, rifiutiInSospeso entries are never cleared unless a data channel opens. If the viewer declines before the DataConnection opens and that channel never opens (for example the sender cancels or drops at that moment), the entry stays. Because peerS keeps the same peer id, the sender's next call would be declined automatically as soon as its new channel opens. Fix: clear the entry on that dc's 'close'/'error', or expire it after about 5s, or delete it in peerV.on('call') for the same peer."
+  ],
+  "critical_code_review_comments": [
+    "stage.html: the avviaStats token guard (timerStats !== mio) prevents stale stats being posted after the call ends. Verified: every new call starts at 'Misuro…'.",
+    "The dc close and cancel handlers now check canali[dc.peer] === dc, so late closes of the previous call's channel are ignored. Verified with a fast re-call.",
+    "viewer.tsx/sender.tsx: startedAt and stats are reset on incoming/calling and on ended, and setFull(false) is called on ended. This fixes the iteration_4 'error instead of ended' timer concern.",
+    "CallStats.tsx thresholds are now 18/10 fps: the fake camera's 19-20 fps stays 'Buona'."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (frontend only)", "frontend": "100%"},
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Two-peer approach: in browser_automation, bt = page.context.browser.browser_type; br = await bt.launch(args=['--use-fake-device-for-media-stream','--use-fake-ui-for-media-stream']); ctx = new_context(viewport 375x667, permissions camera+microphone); open BASE/viewer and BASE/sender; read the 6 digits from viewer-code; wait for sender-status 'Camera pronta'; fill sender-code-input; tap sender-call-button. Quality text comes from the viewer-call-stats-quality and sender-call-stats-quality testIDs; time from *-call-stats-time. Screenshots need a .jpg path when quality is set.",
+  "rca_of_issue": "The iteration_4 decline race is resolved: handlers.decline queues the decline in rifiutiInSospeso when the DataConnection is not open yet and sends it on dc 'open'. Verified on 5 immediate declines across 2 sessions, each reaching the sender in 0.3s."
+}
