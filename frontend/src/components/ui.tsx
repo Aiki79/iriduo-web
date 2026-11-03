@@ -74,6 +74,7 @@ export function Chip({ label, selected, onPress, testID, icon }: { label: string
     <Pressable
       testID={testID}
       onPress={onPress}
+      accessibilityRole="button"
       accessibilityState={{ selected }}
       style={({ pressed }) => [
         styles.chip,

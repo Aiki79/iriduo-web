@@ -69,6 +69,14 @@ export default function Home() {
           />
         </View>
 
+        <Animated.View entering={FadeInDown.delay(300).duration(420)}>
+          <Pressable testID="home-history-button" onPress={() => router.push("/history")} style={({ pressed }) => [styles.historyBtn, pressed && styles.cardPressed]}>
+            <Feather name="clock" size={22} color={colors.brandPrimary} />
+            <Text style={styles.historyText}>Storico chiamate</Text>
+            <Feather name="chevron-right" size={22} color={colors.muted} />
+          </Pressable>
+        </Animated.View>
+
         <Animated.View entering={FadeInDown.delay(320).duration(420)} style={styles.note} testID="home-compat-note">
           <Feather name="info" size={18} color={colors.muted} />
           <Text style={styles.noteText}>
@@ -107,5 +115,18 @@ const styles = StyleSheet.create({
   cardTitle: { fontFamily: fonts.bold, fontSize: 21, color: colors.onSurface },
   cardText: { fontFamily: fonts.regular, fontSize: 15, color: colors.muted, marginTop: spacing.xs, lineHeight: 21 },
   note: { flexDirection: "row", gap: spacing.md, marginTop: spacing.xl, paddingHorizontal: spacing.xs },
+  historyBtn: {
+    marginTop: spacing.lg,
+    minHeight: 56,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    paddingHorizontal: spacing.xl,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceTertiary,
+  },
+  historyText: { flex: 1, fontFamily: fonts.bold, fontSize: 17, color: colors.onSurface },
   noteText: { flex: 1, fontFamily: fonts.regular, fontSize: 14, color: colors.muted, lineHeight: 20 },
 });

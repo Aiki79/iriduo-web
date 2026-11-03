@@ -120,6 +120,106 @@ function avviaVisore(){
   avviaPeerVisore();
 }
 
+
+/* ---------- demo 3D generate al volo (nessun file) ---------- */
+let demo = null, demoCanvas = null, demoTex = null;
+const COL = ['#5CC8E0', '#E0605C', '#E0A85C', '#5CE093', '#EAF0F7'];
+const rnd = (() => { let x = 7; return () => (x = (x * 16807) % 2147483647) / 2147483647; })();
+const stelle = Array.from({ length: 260 }, () => ({ x: rnd(), y: rnd(), z: 6 + rnd() * 6, r: 0.6 + rnd() * 1.6 }));
+const sfere = Array.from({ length: 34 }, (_, i) => ({ x: rnd(), y: 0.2 + rnd() * 0.6, z: 1 + rnd() * 4, c: COL[i % 5], v: (rnd() - 0.5) * 0.03, f: rnd() * 6 }));
+const DEMO_NOMI = { sfere: 'Sfere fluttuanti', tunnel: 'Tunnel di luce', stelle: 'Cielo e scritta 3D' };
+
+function texAttuale(){ return demo ? demoTex : texture; }
+
+function preparaDemo(){
+  if (!demoCanvas) demoCanvas = document.createElement('canvas');
+  demoCanvas.width = formato === 'sbs' ? 2048 : 1024;
+  demoCanvas.height = formato === 'sbs' ? 1024 : 2048;
+  if (demoTex) demoTex.dispose();
+  demoTex = new THREE.CanvasTexture(demoCanvas);
+  demoTex.colorSpace = THREE.SRGBColorSpace;
+}
+
+function sfondo(ctx, w, h){
+  const g = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w * 0.75);
+  g.addColorStop(0, '#17283F'); g.addColorStop(1, '#05080F');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+}
+function disegnaStelle(ctx, w, h, s, K){
+  ctx.fillStyle = '#EAF0F7';
+  for (const st of stelle) { ctx.globalAlpha = 0.5 + 0.5 * (st.r / 2.2); ctx.fillRect(st.x * w + s * K / st.z / 2, st.y * h, st.r, st.r); }
+  ctx.globalAlpha = 1;
+}
+
+function disegnaOcchio(ctx, w, h, t, s){
+  const K = w * 0.035; // disparità massima (px) per oggetti vicini
+  sfondo(ctx, w, h);
+  if (demo === 'sfere') {
+    disegnaStelle(ctx, w, h, s, K);
+    const ord = [...sfere].sort((a, b) => b.z - a.z);
+    for (const b of ord) {
+      const x = (((b.x + t * b.v) % 1) + 1) % 1 * w + s * K / b.z / 2;
+      const y = b.y * h + Math.sin(t * 0.8 + b.f) * h * 0.03;
+      const r = w * 0.06 / b.z;
+      const g = ctx.createRadialGradient(x - r * 0.35, y - r * 0.35, r * 0.1, x, y, r);
+      g.addColorStop(0, '#FFFFFF'); g.addColorStop(0.25, b.c); g.addColorStop(1, '#0E1A2B');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+    }
+  } else if (demo === 'tunnel') {
+    for (let k = 14; k >= 0; k--) {
+      const z = (((k - t * 1.2) % 14) + 14) % 14 + 0.6;
+      const r = w * 0.18 / z * 3;
+      const cx = w / 2 + s * K / z / 2, cy = h / 2;
+      ctx.strokeStyle = COL[k % 5]; ctx.globalAlpha = Math.min(1, 2 / z);
+      ctx.lineWidth = Math.max(1, 14 / z);
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  } else {
+    disegnaStelle(ctx, w, h, s, K);
+    const z1 = 1.3 + Math.sin(t * 0.7) * 0.25;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = `bold ${Math.round(w * 0.16)}px system-ui, sans-serif`;
+    ctx.fillStyle = '#5CC8E0';
+    ctx.fillText('VR180', w / 2 + s * K / z1 / 2, h * 0.47);
+    ctx.font = `bold ${Math.round(w * 0.05)}px system-ui, sans-serif`;
+    ctx.fillStyle = '#EAF0F7';
+    ctx.fillText('Chiamata 3D', w / 2 + s * K / 3 / 2, h * 0.6);
+  }
+}
+
+function disegnaDemo(t){
+  const ctx = demoCanvas.getContext('2d');
+  const W = demoCanvas.width, H = demoCanvas.height, sbs = formato === 'sbs';
+  const ew = sbs ? W / 2 : W, eh = sbs ? H : H / 2;
+  for (const occhio of [0, 1]) {
+    ctx.save();
+    ctx.translate(sbs ? occhio * ew : 0, sbs ? 0 : occhio * eh);
+    ctx.beginPath(); ctx.rect(0, 0, ew, eh); ctx.clip();
+    disegnaOcchio(ctx, ew, eh, t, occhio === 0 ? 1 : -1);
+    ctx.restore();
+  }
+  demoTex.needsUpdate = true;
+}
+
+function fermaDemo(){ if (!demo) return; demo = null; costruisciSfere(); }
+
+handlers.demo = c => {
+  if (chiamataV) { stato('Chiudi prima la chiamata per provare una demo.'); return; }
+  if (!DEMO_NOMI[c.name]) return;
+  video.pause(); video.srcObject = null; video.removeAttribute('src'); video.load();
+  $('file').hidden = true;
+  demo = c.name; preparaDemo(); costruisciSfere(); mostraMedia(true); hint(null);
+  stato('Demo 3D: ' + DEMO_NOMI[c.name] + '. Guardati intorno.');
+  send({ type:'test', name: c.name });
+};
+handlers.stopDemo = () => {
+  if (!demo) return;
+  fermaDemo(); mostraMedia(false); hint('In attesa del video…');
+  send({ type:'test', name: null });
+  stato('In attesa di chiamata.');
+};
+
 function costruisciSfere(){
   mesh.forEach(m => { scena.remove(m); m.geometry.dispose(); m.material.dispose(); });
   mesh = [];
@@ -134,7 +234,7 @@ function costruisciSfere(){
       else v = v * 0.5 + (sorgente === 0 ? 0.5 : 0);
       uv.setXY(i, u, v);
     }
-    const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map: texture }));
+    const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map: texAttuale() }));
     m.layers.set(occhio + 1);
     m.visible = mediaAttivo;
     scena.add(m); mesh.push(m);
@@ -144,6 +244,7 @@ function costruisciSfere(){
 function ridimensiona(){ renderer.setSize(canvas.clientWidth, canvas.clientHeight, false); }
 
 function disegna(){
+  if (demo) disegnaDemo(performance.now() / 1000);
   const w = canvas.clientWidth, h = canvas.clientHeight;
   if (moto && haDati) camera.quaternion.copy(qOff).multiply(qDev);
   else camera.rotation.set(pitch, yaw, 0, 'YXZ');
@@ -194,7 +295,7 @@ handlers.orient = c => {
 };
 handlers.setMotion = c => { moto = !!c.on; haOff = false; haDati = false; };
 handlers.recenter = () => { haOff = false; yaw = 0; pitch = 0; };
-handlers.setFormat = c => { formato = c.value === 'tb' ? 'tb' : 'sbs'; costruisciSfere(); };
+handlers.setFormat = c => { formato = c.value === 'tb' ? 'tb' : 'sbs'; if (demo) preparaDemo(); costruisciSfere(); };
 handlers.setSwap = c => { scambia = !!c.on; costruisciSfere(); };
 handlers.setView = c => { vista = c.value === 'split' ? 'split' : 'drag'; };
 handlers.showFile = c => { $('file').hidden = !c.on; $('hint').style.visibility = c.on ? 'hidden' : ''; };
@@ -238,6 +339,7 @@ handlers.answer = async () => {
   catch { micV = null; stato('Microfono non disponibile: l\'altra persona non ti sentirà.'); }
   if (!attesa) { if (micV) micV.getTracks().forEach(t => t.stop()); micV = null; return; }
   const c = attesa; attesa = null; chiamataV = c;
+  fermaDemo();
   c.answer(micV || undefined);
   const pcV = c.peerConnection;
   if (pcV) pcV.addEventListener('connectionstatechange', () => {
@@ -279,6 +381,7 @@ $('fileProva').onchange = e => {
   const f = e.target.files[0]; if (!f) return;
   $('file').hidden = true;
   if (chiamataV) { stato('Chiudi prima la chiamata per provare un video.'); return; }
+  fermaDemo();
   video.srcObject = null;
   mostraMedia(false);
   video.src = URL.createObjectURL(f); video.loop = true; video.muted = false;
@@ -369,14 +472,24 @@ handlers.call = async c => {
           : 'Errore di collegamento (' + e.type + ').');
         fineS();
       });
-      await new Promise((ok, ko) => { peerS.once('open', ok); peerS.once('error', ko); });
+      await new Promise((ok, ko) => {
+        peerS.once('open', ok); peerS.once('error', ko);
+        setTimeout(() => ko(new Error('timeout')), 15000);
+      });
     }
-  } catch { return; }
+  } catch (e) {
+    if (e && e.message === 'timeout') {
+      stato('Il server di collegamento non risponde: riprova tra poco.');
+      if (peerS) peerS.destroy();
+      fineS();
+    }
+    return;
+  }
   canaleS = peerS.connect(PREFISSO + codice);
-  canaleS.on('data', d => { if (d && d.t === 'decline') { fineS(); stato('Chiamata rifiutata dal visore.'); } });
+  canaleS.on('data', d => { if (d && d.t === 'decline') { stato('Chiamata rifiutata dal visore.'); fineS(); } });
   chiamataS = peerS.call(PREFISSO + codice, streamLocale);
   stato('Squilla: attendi che risponda dal visore.');
-  timerSquillo = setTimeout(() => { if (chiamataS) { annullaS(); stato('Nessuna risposta dal visore.'); } }, 45000);
+  timerSquillo = setTimeout(() => { if (chiamataS) { stato('Nessuna risposta dal visore.'); annullaS(); } }, 45000);
   const pc = chiamataS.peerConnection;
   pc.addEventListener('connectionstatechange', () => {
     if (pc.connectionState === 'connected') {
@@ -386,7 +499,7 @@ handlers.call = async c => {
       send({ type:'connected' });
       stato('Collegato: sei in onda in 3D.');
     }
-    if (pc.connectionState === 'failed') { fineS(); stato('Collegamento non riuscito: la rete potrebbe bloccare la connessione diretta.'); }
+    if (pc.connectionState === 'failed') { stato('Collegamento non riuscito: la rete potrebbe bloccare la connessione diretta.'); fineS(); }
   });
   chiamataS.on('stream', r => { $('audioRemoto').srcObject = r; $('audioRemoto').play().catch(() => {}); });
   const questa = chiamataS;

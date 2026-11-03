@@ -12,7 +12,7 @@ export type StageEvent =
   | { type: "calling" }
   | { type: "connected" }
   | { type: "ended" }
-  | { type: "test"; name: string }
+  | { type: "test"; name: string | null }
   | { type: "devices"; cams: Device[]; mics: Device[]; cam: string; mic: string }
   | { type: "resolution"; w: number; h: number; requested: number }
   | { type: "stats"; kbps: number; fps: number; w: number; h: number; rtt: number | null; loss: number };

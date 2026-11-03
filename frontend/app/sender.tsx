@@ -7,9 +7,10 @@ import { KeyboardAwareScrollView, KeyboardStickyView } from "react-native-keyboa
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { StageView } from "@/src/components/StageView";
-import { CallPill, CallStatsCard, type CallStatsData } from "@/src/components/CallStats";
+import { CallPill, CallStatsCard, quality, type CallStatsData } from "@/src/components/CallStats";
+import { addCall, topQuality, type CallResult } from "@/src/history";
 import type { Device, StageEvent, StageHandle } from "@/src/components/stage-types";
-import { Btn, Chip, ChipRow, Header, Label, StatusBox } from "@/src/components/ui";
+import { Btn, Chip, ChipRow, Header, Label, StatusBox, Toggle } from "@/src/components/ui";
 import { addRecentCode, getRecentCodes } from "@/src/recent";
 import { colors, fonts, radius, spacing } from "@/src/theme";
 
@@ -25,6 +26,7 @@ const BITRATES = [
   { value: 10000000, label: "Bassa · 10 Mbit/s" },
 ];
 const BAR_HEIGHT = 88;
+const LEVELS = [5000000, 10000000, 20000000, 40000000];
 
 function prettyLabel(l: string) {
   const s = l.toLowerCase();
@@ -102,6 +104,15 @@ function SenderBody() {
   const [resText, setResText] = useState("");
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [stats, setStats] = useState<CallStatsData | null>(null);
+  const [camReady, setCamReady] = useState(false);
+  const [autoQ, setAutoQ] = useState(true);
+  const [effBitrate, setEffBitrate] = useState(20000000);
+  const autoDoneRef = useRef(false);
+  const lastStatusRef = useRef("");
+  const pendingRef = useRef<{ code: string; at: number } | null>(null);
+  const callRef = useRef<{ at: number; counts: Record<string, number> } | null>(null);
+  const weakRef = useRef(0);
+  const goodRef = useRef(0);
 
   useEffect(() => {
     getRecentCodes().then(setRecent);
@@ -113,14 +124,58 @@ function SenderBody() {
     if (linkCode && /^\d{6}$/.test(linkCode)) {
       linkRef.current = linkCode;
       setCode(linkCode);
-      setStatus(`Codice ${linkCode} ricevuto dal link: tocca Chiama quando la camera è pronta.`);
+      setStatus(`Codice ${linkCode} ricevuto dal link: chiamo appena la camera è pronta.`);
       setTone("success");
     }
   }, [linkCode]);
 
+  // Effective bitrate follows the chosen maximum when not in a call or when auto quality is off
+  useEffect(() => {
+    if (phase === "idle" || !autoQ) setEffBitrate(bitrate);
+  }, [phase, autoQ, bitrate]);
+
+  // Auto quality: step down after 2 weak readings, back up after 5 good ones (readings every 2s)
+  useEffect(() => {
+    if (!stats || !autoQ || phase !== "live") return;
+    const q = quality(stats).label;
+    if (q === "Debole") {
+      goodRef.current = 0;
+      weakRef.current += 1;
+      if (weakRef.current >= 2) {
+        weakRef.current = 0;
+        setEffBitrate((b) => [...LEVELS].reverse().find((l) => l < b) ?? b);
+      }
+    } else if (q === "Buona") {
+      weakRef.current = 0;
+      goodRef.current += 1;
+      if (goodRef.current >= 5) {
+        goodRef.current = 0;
+        setEffBitrate((b) => {
+          const up = LEVELS.find((l) => l > b);
+          return up && up <= bitrate ? up : b;
+        });
+      }
+    } else {
+      weakRef.current = 0;
+      goodRef.current = 0;
+    }
+  }, [stats, autoQ, phase, bitrate]);
+
+  // Direct link: call automatically once the camera is ready
+  useEffect(() => {
+    const target = linkRef.current;
+    if (!camReady || !target || autoDoneRef.current || phase !== "idle" || code !== target) return;
+    autoDoneRef.current = true;
+    setStatus(`Chiamo automaticamente il visore ${target}…`);
+    setTone("info");
+    pendingRef.current = { code: target, at: Date.now() };
+    addRecentCode(target).then(setRecent);
+    stage.current?.send({ type: "call", code: target });
+  }, [camReady, phase, code]);
+
   const sendConfig = useCallback(() => {
-    if (camId) stage.current?.send({ type: "config", cfg: { cam: camId, mic: micId, res, bitrate } });
-  }, [camId, micId, res, bitrate]);
+    if (camId) stage.current?.send({ type: "config", cfg: { cam: camId, mic: micId, res, bitrate: effBitrate } });
+  }, [camId, micId, res, effBitrate]);
   useEffect(sendConfig, [sendConfig]);
 
   const onEvent = useCallback(
@@ -139,7 +194,10 @@ function SenderBody() {
           setResText(`Risoluzione effettiva: ${e.w} × ${e.h}${e.w < e.requested ? " (la camera non supporta quella richiesta)" : ""}`);
           break;
         case "status":
+          lastStatusRef.current = e.text;
+          if (e.text.startsWith("Camera pronta")) setCamReady(true);
           if (linkRef.current && e.text.startsWith("Camera pronta")) {
+            if (!autoDoneRef.current) break; // auto call effect sets its own status
             setStatus(`Camera pronta. Codice ${linkRef.current} ricevuto dal link: tocca Chiama.`);
             setTone("success");
             break;
@@ -159,14 +217,31 @@ function SenderBody() {
         case "connected":
           setPhase("live");
           setStartedAt((t) => t ?? Date.now());
+          if (!callRef.current) callRef.current = { at: Date.now(), counts: {} };
           break;
-        case "ended":
+        case "ended": {
           setPhase("idle");
           setStartedAt(null);
           setStats(null);
+          const c = callRef.current;
+          const p = pendingRef.current;
+          if (p && c) {
+            addCall({ role: "out", code: p.code, at: c.at, duration: Date.now() - c.at, quality: topQuality(c.counts), result: "completata" });
+          } else if (p) {
+            const s = lastStatusRef.current;
+            const result: CallResult = /rifiutata/i.test(s) ? "rifiutata" : /nessuna risposta/i.test(s) ? "senza-risposta" : /non trovato/i.test(s) ? "non-trovato" : "annullata";
+            addCall({ role: "out", code: p.code, at: p.at, duration: 0, quality: null, result });
+          }
+          callRef.current = null;
+          pendingRef.current = null;
           break;
+        }
         case "stats":
           setStats(e);
+          if (callRef.current) {
+            const l = quality(e).label;
+            callRef.current.counts[l] = (callRef.current.counts[l] ?? 0) + 1;
+          }
           break;
       }
     },
@@ -183,6 +258,7 @@ function SenderBody() {
       return;
     }
     setRecent(await addRecentCode(code));
+    pendingRef.current = { code, at: Date.now() };
     stage.current?.send({ type: "call", code });
   };
 
@@ -219,6 +295,15 @@ function SenderBody() {
         {phase === "live" && startedAt ? (
           <View style={styles.statsWrap}>
             <CallStatsCard startedAt={startedAt} stats={stats} direction="out" testID="sender-call-stats" />
+          </View>
+        ) : null}
+        {phase === "live" && autoQ && effBitrate < bitrate ? (
+          <View style={styles.statsWrap}>
+            <StatusBox
+              testID="sender-auto-quality-notice"
+              tone="warning"
+              text={`Qualità automatica: invio ridotto a ${effBitrate / 1e6} Mbit/s per la connessione debole. Risalirà da sola quando migliora.`}
+            />
           </View>
         ) : null}
 
@@ -278,6 +363,13 @@ function SenderBody() {
             <Chip key={b.value} testID={`sender-bitrate-${b.value}`} label={b.label} selected={bitrate === b.value} onPress={() => setBitrate(b.value)} />
           ))}
         </ChipRow>
+        <Toggle
+          testID="sender-auto-quality-toggle"
+          label="Qualità automatica"
+          hint="Abbassa l’invio se la connessione è debole, poi lo rialza"
+          value={autoQ}
+          onChange={setAutoQ}
+        />
       </KeyboardAwareScrollView>
 
       <KeyboardStickyView offset={{ opened: insets.bottom }} style={[styles.bar, { paddingBottom: insets.bottom + spacing.lg }]}>

@@ -1,0 +1,39 @@
+{
+  "summary": "Frontend-only test of the 4 new features with two Chromium pages (fake media) in one context, 375x667. STORICO: empty state + 'Fai una chiamata' -> /sender OK; after calls rows appear correctly: completed out (Trasmessa, 00:09, Buona, Richiama) + completed in (Ricevuta, 00:09, Buona), declined (Rifiutata on both sides), cancelled (Annullata on sender, 'Persa' on viewer), wrong code 999998 (Codice non trovato); summary '2 chiamate · 00:18 in 3D' / '5 chiamate · 00:00 in 3D'; history-recall-<id> opens /sender?code=X and auto-rings the viewer; clear -> confirm -> No keeps rows, Cancella empties list and stays empty after reload. CHIAMATA AUTOMATICA: /sender?code=X rang the viewer with no Chiama tap in 11/12 runs (~1-1.5s); after hangup/decline it did NOT call again (checked 6-10s). One run never rang in 40s (not reproduced in 8 more runs, probably PeerJS cloud signaling being slow). GALLERIA DEMO: sfere/tunnel/stelle all draw an animated stereo scene (stage mean brightness 36-41 vs 3.5 idle; screenshots look right), viewer-status 'Demo 3D: <nome>. Guardati intorno.', stop button shows up, the tb format switch still draws, fullscreen during the demo works, stop -> black + 'In attesa di chiamata.', answering a call stops the demo. viewer-test-video-button label is 'Video dal telefono'. QUALITÀ AUTOMATICA: toggle is on by default and switches on/off; on a good connection there is no notice and maxBitrate is 20 Mbit/s. Weak stats were injected via postMessage from the stage iframe: notice 'invio ridotto a 10 Mbit/s' appeared and RTCRtpSender maxBitrate really changed to 10000000 with the call staying live; after ~12s of good readings it went back to 20 Mbit/s and the notice went away; turning the toggle off mid-call removed the notice and restored 20 Mbit/s. Regression: answer, sender hangup, viewer hangup, decline, cancel and both stats cards (Buona) all work.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Chiamata automatica (/sender?code=X)", "issue": "Flaky: 1 of 12 runs, the viewer never got the incoming call within 40s. Could not reproduce in 8 more runs. Likely PeerJS cloud signaling latency. There is no retry or user feedback if the auto-call never reaches 'Squilla'.", "affected_testIDs": ["sender-status", "viewer-incoming"]}
+    ],
+    "design_issues": [
+      {"screen": "history", "issues": ["Outgoing rows: the meta line 'Trasmessa · 03 nov, 22:…' gets cut off at 375px because the Richiama button takes the width, so the time is hidden. Consider a shorter date or putting the time on its own line."]},
+      {"screen": "sender", "issues": ["The status 'Chiamo automaticamente il visore X…' is shown for only a few ms. The stage's 'Chiamata in corso…' replaces it right away, so users never really see it (a 500ms poll missed it in 6 of 7 runs; a MutationObserver did catch it)."]},
+      {"screen": "viewer", "issues": ["On a 375x667 screen the code card, share buttons, status and stage leave only ~170px for the controls. The 'Cielo e scritta 3D' chip is off-screen in the horizontal chip row, so it is easy to miss."]}
+    ],
+    "react_native_issues": [
+      {"component": "Chip/Toggle accessibility", "issue": "accessibilityState={{selected}} / {{checked}} does not produce aria-selected or aria-checked on web: both read back as null in Playwright. Use the aria-selected/aria-checked props, or role + aria-* (RN 0.7x). Reference: /app/frontend/src/components/ui.tsx:77, :129"}
+    ]
+  },
+  "test_report_links": ["/app/test_reports/iteration_6.json"],
+  "action_items": [
+    "Optional: show the auto-call status longer (e.g. keep 'Chiamo automaticamente il visore X…' until 'Squilla'), and add a fallback message or retry if the auto-call never reaches the ringing state.",
+    "Optional: stop the outgoing history row meta from cutting off the time (history.tsx Row).",
+    "Optional: make addCall safe against two writers at once (read-modify-write on shared localStorage on web), e.g. serialize with a module-level promise queue.",
+    "Optional: switch Chip/Toggle to aria-selected/aria-checked for web a11y."
+  ],
+  "critical_code_review_comments": [
+    "src/history.ts addCall is a non-atomic read-modify-write. On web, when viewer and sender share one browser storage, near-simultaneous writes could drop a record (did not happen in tests).",
+    "History is ordered by insertion, not by `at`. Failed outgoing calls use the call start time while viewer rows use the end time, so the pair order can look swapped (seen: incoming 'Rifiutata' row above the outgoing one). Cosmetic.",
+    "Viewer records a call cancelled by the caller as 'Persa'. That is fine semantically but differs from the sender's 'Annullata'. Confirm this is intended.",
+    "stage.html loads the non-module three.js build: console warns 'build/three.js deprecated with r150+, removed in r160'. Not breaking at the pinned version.",
+    "Sender auto quality: steps down after 2 consecutive Debole readings and back up after 5 Buona; 'Media' resets both counters. The logic is correct and was verified end-to-end through RTCRtpSender.getParameters()."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (frontend only)", "frontend": "97% (all features pass; 1 flaky auto-call run out of 12)"},
+  "seed_data_creation": "None. History is per-browser localStorage in throwaway Playwright contexts.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Two-peer approach: bt=page.context.browser.browser_type; br=await bt.launch(args=['--use-fake-device-for-media-stream','--use-fake-ui-for-media-stream']); ctx=new_context(375x667, permissions camera+microphone); viewer and sender pages share localStorage, so history gets both rows. Auto-call: goto BASE/sender?code=<viewer code>. Weak-network simulation: get the sender stage iframe (p.frames, url /api/stage?mode=sender), then frame.evaluate(\"()=>window.parent.postMessage(JSON.stringify({type:'stats',kbps:400,fps:5,w:1280,h:640,rtt:600,loss:12}),'*')\") 4x about 300ms apart. Check the bitrate with frame.evaluate('chiamataS.peerConnection.getSenders()...getParameters().encodings[0].maxBitrate'). Check demo rendering via the mean brightness of a viewer-stage-container screenshot (PIL works): idle ~3.5, demo ~36-41.",
+  "rca_of_issue": "Auto-call flake: in the failing run the sender page opened with ?code and the viewer showed a code, but no ring came within 40s (sender status not captured that run). In 8 follow-up runs the event order was always ready -> config -> 'Camera pronta' -> call -> calling -> 'Chiamata in corso…' -> 'Squilla' within ~1s. Most likely a transient delay at the PeerJS cloud broker (peerS 'open' never resolving), since stage.html handlers.call awaits peerS.once('open') with no timeout. Mitigation: add a timeout on peer open with a status message so the user can retry."
+}

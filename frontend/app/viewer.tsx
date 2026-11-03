@@ -10,14 +10,20 @@ import Animated, { FadeIn, useAnimatedStyle, useSharedValue, withRepeat, withTim
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { StageView } from "@/src/components/StageView";
-import { CallPill, CallStatsCard, type CallStatsData } from "@/src/components/CallStats";
+import { CallPill, CallStatsCard, quality, type CallStatsData } from "@/src/components/CallStats";
+import { addCall, topQuality } from "@/src/history";
 import { ShareCode } from "@/src/components/ShareCode";
 import type { StageEvent, StageHandle } from "@/src/components/stage-types";
-import { Btn, Chip, ChipRow, Header, IconBtn, Label, StatusBox, Toggle } from "@/src/components/ui";
+import { Btn, Chip, ChipRow, Header, IconBtn, Label, StatusBox, Toggle, type IconName } from "@/src/components/ui";
 import { colors, fonts, radius, spacing } from "@/src/theme";
 
 type Phase = "connecting" | "waiting" | "incoming" | "answering" | "connected" | "error";
 const isWeb = Platform.OS === "web";
+const DEMOS: { id: string; label: string; icon: IconName }[] = [
+  { id: "sfere", label: "Sfere fluttuanti", icon: "circle" },
+  { id: "tunnel", label: "Tunnel di luce", icon: "target" },
+  { id: "stelle", label: "Cielo e scritta 3D", icon: "star" },
+];
 
 function PulsingAnswer({ onPress }: { onPress: () => void }) {
   const s = useSharedValue(1);
@@ -48,6 +54,11 @@ export default function Viewer() {
   const [micPerm, requestMic] = useMicrophonePermissions();
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [stats, setStats] = useState<CallStatsData | null>(null);
+  const [testing, setTesting] = useState<string | null>(null);
+  const codeRef = useRef<string>("");
+  const callRef = useRef<{ at: number; counts: Record<string, number> } | null>(null);
+  const incomingRef = useRef(false);
+  const declinedRef = useRef(false);
 
   const send = useCallback((c: { type: string; [k: string]: unknown }) => stage.current?.send(c), []);
 
@@ -62,6 +73,7 @@ export default function Viewer() {
           break;
         case "code":
           setCode(e.code);
+          codeRef.current = e.code;
           setPhase("waiting");
           break;
         case "status":
@@ -75,24 +87,44 @@ export default function Viewer() {
           setPhase("incoming");
           setStartedAt(null);
           setStats(null);
+          incomingRef.current = true;
+          declinedRef.current = false;
           if (!isWeb) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           break;
         case "connected":
           setPhase("connected");
           setTestOpen(false);
+          setTesting(null);
           setStartedAt((t) => t ?? Date.now());
+          if (!callRef.current) callRef.current = { at: Date.now(), counts: {} };
+          incomingRef.current = false;
           break;
-        case "ended":
+        case "ended": {
           setPhase("waiting");
           setFull(false);
           setStartedAt(null);
           setStats(null);
+          const c = callRef.current;
+          if (c) {
+            addCall({ role: "in", code: codeRef.current, at: c.at, duration: Date.now() - c.at, quality: topQuality(c.counts), result: "completata" });
+          } else if (incomingRef.current) {
+            addCall({ role: "in", code: codeRef.current, at: Date.now(), duration: 0, quality: null, result: declinedRef.current ? "rifiutata" : "persa" });
+          }
+          callRef.current = null;
+          incomingRef.current = false;
+          declinedRef.current = false;
           break;
+        }
         case "stats":
           setStats(e);
+          if (callRef.current) {
+            const l = quality(e).label;
+            callRef.current.counts[l] = (callRef.current.counts[l] ?? 0) + 1;
+          }
           break;
         case "test":
           setTestOpen(false);
+          setTesting(e.name);
           break;
       }
     },
@@ -176,7 +208,11 @@ export default function Viewer() {
             <Animated.View entering={FadeIn} style={styles.incoming} testID="viewer-incoming">
               <PulsingAnswer onPress={answer} />
               <View style={styles.flex}>
-                <Btn testID="viewer-decline-button" label="Rifiuta" icon="x" variant="danger" onPress={() => send({ type: "decline" })} />
+                <Btn testID="viewer-decline-button" label="Rifiuta" icon="x" variant="danger" onPress={() => {
+                    declinedRef.current = true;
+                    send({ type: "decline" });
+                  }}
+                />
               </View>
             </Animated.View>
           )}
@@ -262,10 +298,25 @@ export default function Viewer() {
           <Toggle testID="viewer-swap-toggle" label="Scambia occhio sinistro e destro" value={swap} onChange={setSwap} />
 
           <Label>Prova senza chiamata</Label>
-          <Text style={styles.small}>Carica un video VR180 salvato sul telefono per verificare l’effetto 3D.</Text>
+          <Text style={styles.small}>Scegli una demo 3D già pronta, oppure carica un video VR180 salvato sul telefono.</Text>
+          <ChipRow testID="viewer-demo-chips">
+            {DEMOS.map((d) => (
+              <Chip
+                key={d.id}
+                testID={`viewer-demo-${d.id}-chip`}
+                icon={d.icon}
+                label={d.label}
+                selected={testing === d.id}
+                onPress={() => !inCall && send({ type: "demo", name: d.id })}
+              />
+            ))}
+          </ChipRow>
+          {testing && DEMOS.some((d) => d.id === testing) ? (
+            <Btn compact testID="viewer-demo-stop-button" label="Ferma la demo" icon="square" onPress={() => send({ type: "stopDemo" })} style={styles.mt} />
+          ) : null}
           <Btn
             testID="viewer-test-video-button"
-            label={testOpen ? "Annulla" : "Scegli un video di prova"}
+            label={testOpen ? "Annulla" : "Video dal telefono"}
             icon={testOpen ? "x" : "film"}
             disabled={inCall}
             onPress={() => setTestOpen((o) => !o)}

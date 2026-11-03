@@ -14,6 +14,11 @@
 - Native: expo-sensors DeviceMotion for looking around, expo-screen-orientation for landscape fullscreen, expo-camera permissions, recent codes stored locally
 
 ## Implemented (2026-06)
+- Call history (/history, local storage): incoming/outgoing, duration, average quality, result, Richiama (auto-call), clear
+- Auto call from link/Richiama once the camera is ready (only once)
+- Procedural stereo 3D demos (Sfere, Tunnel, Stelle) as a CanvasTexture in the stage, no files needed
+- Auto quality: sending bitrate steps down after weak readings and back up after good ones (5/10/20/40 Mbit), switch + notice
+- 15s timeout when connecting to the PeerJS server
 - Call timer: getStats every 2s in the stage. Duration, quality (Good/Medium/Weak), Mbit/s, fps, delay and loss shown on viewer (card + pill in fullscreen) and sender (pill on preview + card). Decline made reliable (queued until the data connection opens); viewer leaves fullscreen when the call ends
 - Direct link: the shared message contains https link /api/join?code=X&app=<createURL base>. The landing page redirects to app sender?code=X (exp://, frontend:// or same-host https). The sender prefills the code and shows a "ricevuto dal link" status
 - Share code (viewer): WhatsApp (wa.me), SMS (sms: body), Other (system share sheet) buttons under the code, with a ready-made Italian message
