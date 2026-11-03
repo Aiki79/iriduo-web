@@ -1,0 +1,35 @@
+{
+  "summary": "Tested the 'Link Diretto' deep-link feature plus a light regression. Backend /api/join: 19/20 pytest pass. exp:// base works, javascript:/data:/evil hosts fall back to frontend://, XSS in the app param is escaped, and a code that isn't 6 digits returns 422. FAIL: a same-host https base is never accepted on the public URL. Frontend: the WhatsApp button opens wa.me with the code and a link to /api/join?code=<code>&app=... (code matches). /sender?code=654321 fills in the input and enables Chiama. An invalid ?code= is ignored. BUT the 'ricevuto dal link' status only shows for ~300ms; the stage's 'Camera pronta. Inserisci il codice del visore.' message then replaces it. Regression: home, the viewer code and the sender page all load.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/join", "issue": "Same-host https base is always rejected through the public ingress. Cause 1: request.url.hostname is the internal host the ingress forwards, not the public host. Proof: the public URL with app=https://<public-host>/ returns frontend://, while localhost:8001 with Host:<public-host> returns the https link. Cause 2: on web, ExpoLinking.createURL('/') gives 'https://<host>' with NO trailing slash, so startswith('https://<host>/') fails even when the host matches. Result: every link shared from the web preview points to frontend://sender?code=..., which does nothing in a desktop or mobile browser."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "sender status (link prefill)", "issue": "The 'Codice X ricevuto dal link…' status is overwritten ~300ms after load by the stage status event 'Camera pronta. Inserisci il codice del visore.' This happens with and without camera permission. The final message wrongly asks the user to enter a code that is already filled in. The code input stays prefilled and Chiama is enabled.", "testID": "sender-status", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [
+      {"flow": "Web-shared link -> join page -> sender", "issue": "The join page redirects to frontend://sender?code=... instead of https://<host>/sender?code=... because of the backend issue above, so the web preview link never opens the sender page.", "affected_testIDs": ["viewer-share-whatsapp-button"]}
+    ],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_join_link.py", "/app/backend/tests/test_stage_api.py", "/app/test_reports/pytest/pytest_results_iter3.xml"],
+  "action_items": [
+    "server.py join(): build own_web from the forwarded public host (request.headers.get('x-forwarded-host') or request.headers.get('host')), or compare urlparse(app_base) with scheme=='https' and hostname matching. Also accept the base with or without a trailing slash (web createURL('/') returns 'https://host'). Then re-run test_join_link.py::test_same_host_https_allowed and test the real generated link app=https%3A%2F%2F<host>.",
+    "sender.tsx: keep the link message after stage status events. For example, store linkCode in a ref and, in the 'status' handler, show 'Camera pronta. Codice X ricevuto dal link: tocca Chiama.' when the code is still the link code, instead of the generic 'Inserisci il codice del visore.'"
+  ],
+  "critical_code_review_comments": [
+    "join(): the open-redirect guard is sound: it requires a trailing slash after the host, so https://host.evil.com is rejected (tested), and html.escape protects the href.",
+    "ShareCode.tsx: the SMS/Altro messages use the same joinLink, so the web fallback issue affects them too."
+  ],
+  "updated_files": ["/app/backend/tests/test_join_link.py"],
+  "success_rate": {"backend": "95% (19/20)", "frontend": "~80% (prefill/enable/WhatsApp link OK; link status message not persisted)"},
+  "seed_data_creation": "None",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: export EXPO_PUBLIC_BACKEND_URL from frontend/.env; pytest /app/backend/tests/. The WhatsApp popup is caught with ctx.expect_page() after clicking viewer-share-whatsapp-button; the URL redirects to api.whatsapp.com/send/?text=..., so unquote it and regex /api/join?code=. Poll sender-status every 100ms from load to see whether the link message gets overwritten. Native exp:// and frontend:// opening can't be verified on web.",
+  "rca_of_issue": "Same-host check: request.url.hostname behind the K8s ingress is not the public hostname, and the frontend sends the base without a trailing slash. Status overwrite: the StageView 'status' event (camera ready) calls setStatus() unconditionally after the link useEffect has run."
+}

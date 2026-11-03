@@ -1,4 +1,5 @@
 import { Feather } from "@react-native-vector-icons/feather";
+import * as ExpoLinking from "expo-linking";
 import { Linking, Platform, Pressable, Share, StyleSheet, Text, View } from "react-native";
 
 import type { IconName } from "@/src/components/ui";
@@ -7,8 +8,11 @@ import { colors, fonts, radius, spacing } from "@/src/theme";
 const WHATSAPP_GREEN = "#25D366"; // brand color, identical in every theme
 const WHATSAPP_ON = "#0B2E17";
 
+const joinLink = (code: string) =>
+  `${process.env.EXPO_PUBLIC_BACKEND_URL}/api/join?code=${code}&app=${encodeURIComponent(ExpoLinking.createURL("/"))}`;
+
 const message = (code: string) =>
-  `Ti aspetto su Chiamata VR180! Il codice del mio visore è ${code}. Apri l'app, scegli "Trasmetto in VR180" e inseriscilo per chiamarmi in 3D.`;
+  `Ti aspetto su Chiamata VR180! Il codice del mio visore è ${code}. Tocca il link per aprire l'app e chiamarmi in 3D: ${joinLink(code)}`;
 
 function ShareBtn({ label, icon, onPress, testID, bg, fg, border }: { label: string; icon: IconName; onPress: () => void; testID: string; bg: string; fg: string; border: string }) {
   return (

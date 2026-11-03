@@ -1,7 +1,8 @@
 import asyncio
 from contextlib import suppress
-from fastapi import FastAPI, APIRouter, Query
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, APIRouter, Query, Request
+from fastapi.responses import FileResponse, HTMLResponse
+import html
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -86,6 +87,24 @@ STAGE_HTML = ROOT_DIR / "stage.html"
 async def stage():
     """3D stage (WebRTC + three.js) embedded by the mobile app."""
     return FileResponse(STAGE_HTML, media_type="text/html", headers={"Cache-Control": "no-cache"})
+
+
+JOIN_HTML = (ROOT_DIR / "join.html").read_text(encoding="utf-8")
+APP_SCHEMES = ("frontend://", "exp://", "exps://")
+
+
+@api_router.get("/join", include_in_schema=False)
+async def join(request: Request, code: str = Query(..., pattern=r"^\d{6}$"), app_base: str = Query("frontend://", alias="app", max_length=300)):
+    """Shareable https link: opens the app on the sender screen with the code filled in."""
+    host = (request.headers.get("x-forwarded-host") or request.headers.get("host") or "").split(",")[0].strip()
+    own_web = f"https://{host}"  # web preview: same host as the API
+    same_host = bool(host) and (app_base == own_web or app_base.startswith(own_web + "/"))
+    base = app_base if app_base.startswith(APP_SCHEMES) or same_host else "frontend://"
+    if not base.endswith("/"):
+        base += "/"
+    app_url = html.escape(f"{base}sender?code={code}", quote=True)
+    page = JOIN_HTML.replace("{{CODE}}", code).replace("{{APP_URL}}", app_url)
+    return HTMLResponse(page, headers={"Cache-Control": "no-cache"})
 
 
 # Include the router in the main app

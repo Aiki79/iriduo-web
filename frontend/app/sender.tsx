@@ -1,5 +1,6 @@
 import { Feather } from "@react-native-vector-icons/feather";
 import { useCameraPermissions, useMicrophonePermissions } from "expo-camera";
+import { useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Linking, Platform, StyleSheet, Text, TextInput, View } from "react-native";
 import { KeyboardAwareScrollView, KeyboardStickyView } from "react-native-keyboard-controller";
@@ -103,6 +104,17 @@ function SenderBody() {
     getRecentCodes().then(setRecent);
   }, []);
 
+  const { code: linkCode } = useLocalSearchParams<{ code?: string }>();
+  const linkRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (linkCode && /^\d{6}$/.test(linkCode)) {
+      linkRef.current = linkCode;
+      setCode(linkCode);
+      setStatus(`Codice ${linkCode} ricevuto dal link: tocca Chiama quando la camera è pronta.`);
+      setTone("success");
+    }
+  }, [linkCode]);
+
   const sendConfig = useCallback(() => {
     if (camId) stage.current?.send({ type: "config", cfg: { cam: camId, mic: micId, res, bitrate } });
   }, [camId, micId, res, bitrate]);
@@ -124,6 +136,11 @@ function SenderBody() {
           setResText(`Risoluzione effettiva: ${e.w} × ${e.h}${e.w < e.requested ? " (la camera non supporta quella richiesta)" : ""}`);
           break;
         case "status":
+          if (linkRef.current && e.text.startsWith("Camera pronta")) {
+            setStatus(`Camera pronta. Codice ${linkRef.current} ricevuto dal link: tocca Chiama.`);
+            setTone("success");
+            break;
+          }
           setStatus(e.text);
           setTone(/errore|non |negato/i.test(e.text) ? "error" : /collegato/i.test(e.text) ? "success" : "info");
           break;

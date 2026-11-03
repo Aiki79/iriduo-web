@@ -14,6 +14,7 @@
 - Native: expo-sensors DeviceMotion for looking around, expo-screen-orientation for landscape fullscreen, expo-camera permissions, recent codes stored locally
 
 ## Implemented (2026-06)
+- Direct link: the shared message contains https link /api/join?code=X&app=<createURL base>. The landing page redirects to app sender?code=X (exp://, frontend:// or same-host https). The sender prefills the code and shows a "ricevuto dal link" status
 - Share code (viewer): WhatsApp (wa.me), SMS (sms: body), Other (system share sheet) buttons under the code, with a ready-made Italian message
 - App icon from the user's image (IMG_2031): rounded corners filled and saved as 1024 icon, Android adaptive icon (background #243757), splash and favicon. Logo shown on the home screen
 - Home with two roles; dark theme taken from the HTML; Atkinson Hyperlegible font
