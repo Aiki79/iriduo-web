@@ -1,0 +1,40 @@
+{
+  "summary": "Backend: /api/stage?mode=viewer|sender returns HTML 200 (no-cache, PeerJS+three CDN reachable) - 5/5 pytest pass. Frontend (375x667 web preview): Home cards navigate to /viewer and /sender; viewer gets 6-digit PeerJS code within ~2s, status text, drag/split chips switch selection and stage aspect (16:9 -> 2:1), split tip + split fullscreen button, fullscreen/exit, format chips, swap toggle, motion toggle inert on web, test-video button toggles 'Annulla', header back all work. Sender: input strips non-digits and caps at 6, Chiama disabled until 6 digits, resolution/bitrate chips selectable, fake camera detected ('Camera pronta'). E2E with fake media PASSED: call -> viewer-incoming -> answer -> both connected (sender-live-badge, viewer-hangup-button, viewer-hangup-fullscreen-button); hangup from either side returns both to idle; re-call works; wrong code shows 'Codice non trovato'; recent code chip appears and persists after reload. Bugs found in call-signalling edge cases: (1) viewer 'Rifiuta' does not notify sender - sender stays 'Squilla' forever; (2) sender 'Annulla chiamata' while ringing does not notify viewer - viewer stays on incoming UI and answering it yields a phantom 'Collegato' with black video. No deprecated Expo packages, no SafeAreaView issues detected.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Viewer decline (stage.html handlers.decline, line ~201)", "issue": "attesa.close() on an unanswered PeerJS MediaConnection is not signalled to the caller. Sender remains in phase 'calling' with status 'Squilla: attendi che risponda dal visore.' indefinitely (verified after 3s+, no ring timeout exists).", "testID": "viewer-decline-button / sender-status", "priority": "HIGH"},
+      {"component": "Sender cancel while ringing (stage.html fineS / viewer peer 'call' handler, lines ~166-171, 314-319)", "issue": "When sender taps 'Annulla chiamata' before viewer answers, viewer keeps showing viewer-incoming (Rispondi/Rifiuta) forever. Tapping Rispondi then shows 'Collegato: sei in chiamata 3D.' + hangup button with black video (phantom call) because 'connected' is emitted on the 'stream' event instead of real ICE connectionState.", "testID": "viewer-incoming / viewer-answer-button", "priority": "HIGH"},
+      {"component": "Viewer stage after call ends (stage.html chiudiV, ~191-199)", "issue": "After hang-up the 3D sphere keeps showing the last received video frame (VideoTexture not cleared) and the hint may read 'Tocca la scena per avviare il video' (late play() rejection overwrites 'In attesa del video…').", "testID": "viewer-stage", "priority": "LOW"},
+      {"component": "Sender connectionState 'failed' (stage.html ~308)", "issue": "On ICE failure only the status text changes; phase stays 'calling' and no 'ended' event is sent (no auto cleanup / timeout).", "testID": "sender-status", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Viewer / Sender", "issues": ["Chips (Chip component, ui.tsx height:40) are below the 44pt minimum touch target.", "PulsingAnswer scales Rispondi to 1.04 so it overflows the 16px left gutter (x=12) and is wider than Rifiuta; looks unbalanced.", "File-pick overlay 'Tocca qui per scegliere un video VR180' is drawn over the 'In attesa del video…' hint text (overlapping text)."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_stage_api.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "HIGH: Make decline reach the sender - e.g. viewer opens a PeerJS DataConnection / sends a 'declined' message (or sender opens a data channel alongside the call), and add a ring timeout (~30-45s) on the sender that calls fineS() with status 'Nessuna risposta'.",
+    "HIGH: Notify viewer when sender cancels while ringing (data message 'cancel' or listen to the pending call's 'close'/peerConnection state and clear attesa -> send 'ended'); in handlers.answer emit 'connected' only when peerConnection.connectionState === 'connected'.",
+    "LOW: On chiudiV clear the video texture (e.g. hide spheres / render black) and guard the play().catch hint so it doesn't overwrite the idle hint after the call ended.",
+    "LOW: On pc.connectionState 'failed' call fineS() so the sender UI returns to idle.",
+    "LOW: Raise Chip height to >=44; remove the scale overflow on Rispondi (use flex on both buttons / pulse opacity instead); hide the 'In attesa del video…' hint while file overlay is visible."
+  ],
+  "critical_code_review_comments": [
+    "stage.html peer 'call' handler only rejects when chiamataV exists; a second incoming call while one is ringing silently overwrites 'attesa' without closing the previous one.",
+    "Viewer 'connected' state relies on MediaConnection 'stream' event, which fires on setRemoteDescription even if ICE never connects - leads to false 'Collegato'.",
+    "No deprecated packages (expo-av/barcode-scanner/background-fetch) and no react-native SafeAreaView usage found."
+  ],
+  "updated_files": ["/app/backend/tests/test_stage_api.py"],
+  "success_rate": {"backend": "100%", "frontend": "90% (all requested flows pass; 2 HIGH edge-case signalling bugs)"},
+  "seed_data_creation": "None. Only localStorage recent codes in the test browser.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "browser_automation chromium already exposes fake media (fake_device_0). E2E: open /viewer in page, read viewer-code, open second page via page.context.new_page() at /sender, fill code, click sender-call-button, wait viewer-incoming. Use .jpeg paths for screenshots on secondary page (png+quality fails). Env var in frontend/.env is EXPO_PUBLIC_BACKEND_URL.",
+  "rca_of_issue": "Decline/cancel: PeerJS MediaConnection.close() before answer does not send any signal to the remote peer (the RTCPeerConnection never left 'have-local-offer'), so neither side's 'close' fires. Repro: viewer code -> sender Chiama -> viewer Rifiuta -> sender stuck 'Squilla'; or sender Annulla chiamata while ringing -> viewer stuck on Rispondi. Mitigation: explicit signalling via PeerJS DataConnection + ring timeout, and base 'connected' on connectionState."
+}

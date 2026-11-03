@@ -1,0 +1,129 @@
+{
+  "app_name": "VR180",
+  "personality": "7 Dark-First Utility DARK",
+  "personality_one_liner": "Strumento di trasmissione e visione 3D dal design tecnico, focalizzato su performance, alto contrasto e accessibilità.",
+  "color": {
+    "surface": "#0E1A2B",
+    "onSurface": "#EAF0F7",
+    "surfaceSecondary": "#17283F",
+    "onSurfaceSecondary": "#EAF0F7",
+    "surfaceTertiary": "#122033",
+    "onSurfaceTertiary": "#EAF0F7",
+    "surfaceInverse": "#EAF0F7",
+    "onSurfaceInverse": "#0E1A2B",
+    "brand": "#5CC8E0",
+    "brandPrimary": "#5CC8E0",
+    "onBrandPrimary": "#0E1A2B",
+    "brandSecondary": "#2A4060",
+    "onBrandSecondary": "#EAF0F7",
+    "brandTertiary": "#17283F",
+    "onBrandTertiary": "#EAF0F7",
+    "success": "#5CE093",
+    "onSuccess": "#0E1A2B",
+    "warning": "#E0A85C",
+    "onWarning": "#3A2A10",
+    "error": "#E0605C",
+    "onError": "#FFFFFF",
+    "border": "#2A4060",
+    "borderStrong": "#5CC8E0",
+    "divider": "#2A4060",
+    "muted": "#9DB0C8",
+    "onBrand": "#0E1A2B"
+  },
+  "typography": {
+    "displayFontFamily": "Atkinson Hyperlegible",
+    "textFontFamily": "Atkinson Hyperlegible",
+    "scale": {
+      "sm": 12,
+      "base": 14,
+      "lg": 18,
+      "xl": 24,
+      "2xl": 32
+    }
+  },
+  "spacing": {
+    "rule": "Layout spazioso con touch target di almeno 56px per l'accessibilità come richiesto. Margini generosi per evitare tocchi accidentali durante l'uso in Cardboard.",
+    "xs": 4,
+    "sm": 8,
+    "md": 12,
+    "lg": 16,
+    "xl": 24,
+    "2xl": 32,
+    "3xl": 48
+  },
+  "radius_tokens": {
+    "sm": 6,
+    "md": 14,
+    "lg": 20,
+    "pill": 999
+  },
+  "shadow_tier": "0",
+  "navigation": "stack_only",
+  "icon_set": "Feather",
+  "glassmorphism": {
+    "enabled": "false",
+    "do's": [
+      "Nessun effetto glass per mantenere le performance alte durante il video 3D."
+    ],
+    "dont's": [
+      "Non usare blur, appesantisce il rendering VR."
+    ]
+  },
+  "platform_libraries": {
+    "glass": {
+      "ios": "solid surfaceSecondary",
+      "android": "solid surfaceSecondary",
+      "low_end_android_fallback": "solid surfaceSecondary"
+    },
+    "image": "expo-image",
+    "blur": "solid surfaceSecondary",
+    "bottom_sheet": "@gorhom/bottom-sheet",
+    "animation": "react-native-reanimated",
+    "gesture": "react-native-gesture-handler"
+  },
+  "screens": [
+    {
+      "name": "Home",
+      "purpose": "Selezione rapida del ruolo dell'utente: Guardo (Spettatore) o Trasmetto (Broadcaster).",
+      "states": {
+        "loading": "Schermata nera con spinner --accento.",
+        "empty": "N/A",
+        "error": "N/A"
+      },
+      "layout": "Sfondo con immagine hero della telecamera scurita (con scrim). Due grandi card (altezza minima 160pt) affiancate o impilate, con icone grandi, che portano ai due flussi. Titolo grande in alto."
+    },
+    {
+      "name": "Guardo (Viewer)",
+      "purpose": "Interfaccia per inserire il codice, attendere la chiamata e visualizzare il flusso video 3D/Cardboard.",
+      "states": {
+        "loading": "Spinner e testo 'In attesa del segnale...'",
+        "empty": "Mostra il codice a 6 cifre assegnato e un'attesa per la chiamata.",
+        "error": "Messaggio 'Errore di connessione' con bottone 'Riprova'."
+      },
+      "layout": "In modalita attesa: Codice a 6 cifre ben visibile al centro. Pulsante 'Test video locale' in basso. In modalita chiamata: Pulsante 'Rispondi' animato. In modalita visione: HUD overlay (invisibile se inattivo). Toggles in basso: Cardboard (split-screen) vs Modalita drag-to-look (singolo fullscreen), Swap Eyes, Formato (affiancate/sopra-sotto). Pulsante rosso 'Chiudi chiamata' sempre accessibile (safe area in basso)."
+    },
+    {
+      "name": "Trasmetto (Sender)",
+      "purpose": "Pannello di controllo pre-live e live per inviare il video 3D dalla doppia fotocamera.",
+      "states": {
+        "loading": "Inizializzazione fotocamere in corso...",
+        "empty": "N/A",
+        "error": "Permessi fotocamera mancanti."
+      },
+      "layout": "Video preview in fullscreen (o top 60%). Pannello inferiore fisso (`surfaceSecondary`) con Segmented Controls (chips) per: Risoluzione (4K/2.9K/HD) e Bitrate (Alta/Media/Bassa). Toggle icone per Mic/Cam. Input testuale per il codice a 6 cifre con lista codici recenti. Grande CTA sticky in basso: 'Chiama' (brandPrimary) che diventa 'Chiudi' (error) durante la trasmissione."
+    }
+  ],
+  "images": {
+    "home_hero": {
+      "url": "https://images.unsplash.com/photo-1535540878298-a155c6d065ef?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2NDJ8MHwxfHNlYXJjaHwxfHxkYXJrJTIwY2FtZXJhJTIwbGVucyUyMGNsb3NlJTIwdXB8ZW58MHx8fHwxNzkzNzQyMTI0fDA&ixlib=rb-4.1.0&q=85",
+      "alt": "dark camera lens background"
+    }
+  },
+  "instructions_to_main_agent": [
+    "Usa rigorosamente il font 'Atkinson Hyperlegible' come richiesto dall'utente.",
+    "La palette colori DEVE seguire esattamente i codici esadecimali specificati: sfondo #0E1A2B, pannelli #17283F, accento #5CC8E0, rosso #E0605C, warning #E0A85C su #3a2a10.",
+    "Nessun effetto blur/glass: stiamo renderizzando video VR 3D, occorre preservare le performance, usa tinte piatte (surfaceSecondary).",
+    "Mantieni tutti i pulsanti e touch target ad almeno 56px di altezza, raggio 14px come esplicitamente richiesto.",
+    "Nella modalita 'Guardo', implementa lo switch tra Cardboard (split-screen 50% sx / 50% dx) e modalita tocco (schermo intero con drag pan) come pattern principale."
+  ]
+}

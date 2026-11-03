@@ -1,0 +1,23 @@
+{
+  "summary": "Retest of iteration_1 call-signalling fixes using two pages in a chromium launched with --use-fake-device-for-media-stream/--use-fake-ui-for-media-stream (375x667). ALL PASSED: (1) viewer Rifiuta while ringing -> sender 'Chiamata rifiutata dal visore.', sender-call-button visible, hangup hidden; viewer 'Chiamata rifiutata. In attesa di chiamata.' (also works when declining immediately after incoming appears). (2) sender Annulla chiamata while ringing -> viewer-incoming disappears, viewer 'Chiamata annullata da chi chiamava. In attesa di chiamata.'; closing the sender tab while ringing also clears viewer incoming. (3) Answer flow: sender-live-badge + viewer-hangup-button, statuses 'Collegato...' on both, fake green video rendered; hangup from viewer and from sender -> both idle; viewer stage black with 'In attesa del video…' (iframe hint visible, no stale frame - screenshot verified). (4) Ring timeout: sender returned to idle after exactly 45.0s with 'Nessuna risposta dal visore.', viewer incoming cleared with 'Chiamata annullata...'. (5) Chips now 44px high (viewer-view-drag-chip, viewer-format-sbs-chip); Rispondi stays within 16px margin (x 16.4-19.7) and equals Rifiuta width at rest (~165px, pulses down to 0.95 scale). No deprecated Expo packages / SafeAreaView issues observed in reviewed files.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_stage_api.py"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "stage.html handlers.decline only notifies sender if the PeerJS DataConnection is already open (dc.open); on slow networks a very fast decline could fall back to the 45s ring timeout. Optional: queue the decline until dc 'open' or also close via call.",
+    "Callers that don't open a DataConnection (e.g. the external Meta Quest page mentioned on home) won't receive decline; they rely on their own timeout.",
+    "viewer peer 'connection' handler accepts any incoming DataConnection without limit; harmless but could be keyed only to the pending call's peer."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (not requested)", "frontend": "100%"},
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Two-peer test approach: in browser_automation, bt = page.context.browser.browser_type; launch a new browser with fake media args, new_context with camera/microphone permissions, open /viewer and /sender, read 6-digit code from viewer-code, wait for sender-status 'Camera pronta', fill sender-code-input, tap sender-call-button, wait viewer-incoming. Stage hint lives in the iframe (#hint)."
+}

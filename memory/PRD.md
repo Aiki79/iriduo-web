@@ -1,0 +1,24 @@
+# PRD – Chiamata VR180 (Expo app)
+
+## Original problem
+"Crea un'app mobile" from the uploaded index.html "Chiamata VR180": a 3D video call. The sender uses a dual-lens VR180 camera and the viewer watches in a headset, using PeerJS (WebRTC) with a 6-digit code. Then "index 2.html" was uploaded ("Questa é l'immagine dell'app"). It is identical except for icon links (icona.svg, icona-192.png). The icon files were NOT uploaded.
+
+## User choices
+- The phone both watches and transmits
+- 3D view on the phone: drag with a finger AND split-screen (Cardboard), switchable
+- Default: reuse the page's logic inside the app (WebView), so it stays compatible with the Meta Quest page
+
+## Architecture
+- Backend FastAPI: GET /api/stage?mode=viewer|sender serves stage.html (three.js + PeerJS, the same prefix `vr180chiamata-`)
+- Frontend Expo Router: index (home), viewer, sender. StageView = WebView (native) or iframe (web), bridged with postMessage/injectJavaScript
+- Native: expo-sensors DeviceMotion for looking around, expo-screen-orientation for landscape fullscreen, expo-camera permissions, recent codes stored locally
+
+## Implemented (2026-06)
+- Home with two roles; dark theme taken from the HTML; Atkinson Hyperlegible font
+- Viewer: 6-digit code, status, Answer/Decline, drag view or split view, phone motion, recentre, landscape fullscreen, SBS/TB format, eye swap, test video
+- Sender: permission gate, choice of camera, microphone, resolution and bitrate, preview, code entry, recent codes, Call/Cancel/Hang up, live badge
+- Decline/cancel signalling over a PeerJS data connection, 45s ring timeout
+
+## Backlog
+- P1: app icon (waiting for the image from the user)
+- P2: call duration timer, sharing the code, call history

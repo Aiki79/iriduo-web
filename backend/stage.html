@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="color-scheme" content="dark">
+<title>Scena VR180</title>
+<style>
+  html,body{margin:0;height:100%;background:#000;overflow:hidden;color:#EAF0F7;
+    font-family:system-ui,sans-serif;-webkit-user-select:none;user-select:none}
+  [hidden]{display:none!important}
+  #stage{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+  #anteprima{position:fixed;inset:0;width:100%;height:100%;object-fit:contain;background:#000}
+  #hint{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+    color:#9DB0C8;font-size:16px;text-align:center;padding:16px;pointer-events:none}
+  #file{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(14,26,43,.88)}
+  #file label{border:2px dashed #5CC8E0;border-radius:14px;padding:18px 22px;font-size:18px;font-weight:700;
+    color:#5CC8E0;text-align:center;max-width:80%}
+  #file input{display:none}
+</style>
+</head>
+<body>
+<canvas id="stage"></canvas>
+<video id="anteprima" autoplay muted playsinline hidden></video>
+<div id="hint">In attesa del video…</div>
+<div id="file" hidden><label>Tocca qui per scegliere un video VR180<input type="file" id="fileProva" accept="video/*"></label></div>
+<audio id="audioRemoto" autoplay></audio>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script>
+const PREFISSO = 'vr180chiamata-';
+const MODE = new URLSearchParams(location.search).get('mode') || 'viewer';
+const $ = id => document.getElementById(id);
+
+/* ---------- ponte con l'app ---------- */
+function send(o){
+  const s = JSON.stringify(o);
+  if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(s);
+  else if (window.parent !== window) window.parent.postMessage(s, '*');
+}
+const handlers = {};
+window.app = { cmd(c){ const h = handlers[c && c.type]; if (h) { try { h(c); } catch (e) { send({ type:'status', text:'Errore: ' + e.message }); } } } };
+addEventListener('message', e => {
+  let c = e.data;
+  if (typeof c === 'string') { try { c = JSON.parse(c); } catch { return; } }
+  if (c && c.__cmd) window.app.cmd(c);
+});
+const stato = t => send({ type:'status', text:t });
+const hint = (t) => { $('hint').hidden = !t; if (t) $('hint').textContent = t; };
+
+/* =================== VISORE =================== */
+let renderer, scena, camera, video, texture, mesh = [], canvas;
+let formato = 'sbs', scambia = false, vista = 'drag', moto = false, yaw = 0, pitch = 0;
+let peerV, attesa = null, chiamataV = null, micV = null;
+const canali = {};
+const qDev = new THREE.Quaternion(), qOff = new THREE.Quaternion();
+let haOff = false, haDati = false, mediaAttivo = false;
+const mostraMedia = on => { mediaAttivo = on; mesh.forEach(m => m.visible = on); };
+
+function avviaVisore(){
+  video = document.createElement('video');
+  video.playsInline = true; video.setAttribute('playsinline', ''); video.crossOrigin = 'anonymous';
+  video.addEventListener('playing', () => { hint(null); mostraMedia(true); });
+  canvas = $('stage');
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  scena = new THREE.Scene();
+  scena.background = new THREE.Color(0x000000);
+  camera = new THREE.PerspectiveCamera(75, 16/9, 0.1, 100);
+  texture = new THREE.VideoTexture(video);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  costruisciSfere();
+  ridimensiona(); addEventListener('resize', ridimensiona);
+  trascinamento(canvas);
+  renderer.setAnimationLoop(disegna);
+  avviaPeerVisore();
+}
+
+function costruisciSfere(){
+  mesh.forEach(m => { scena.remove(m); m.geometry.dispose(); m.material.dispose(); });
+  mesh = [];
+  for (const occhio of [0, 1]) {
+    const g = new THREE.SphereGeometry(10, 96, 48, Math.PI, Math.PI);
+    g.scale(-1, 1, 1);
+    const uv = g.attributes.uv;
+    const sorgente = scambia ? 1 - occhio : occhio;
+    for (let i = 0; i < uv.count; i++) {
+      let u = uv.getX(i), v = uv.getY(i);
+      if (formato === 'sbs') u = u * 0.5 + sorgente * 0.5;
+      else v = v * 0.5 + (sorgente === 0 ? 0.5 : 0);
+      uv.setXY(i, u, v);
+    }
+    const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map: texture }));
+    m.layers.set(occhio + 1);
+    m.visible = mediaAttivo;
+    scena.add(m); mesh.push(m);
+  }
+}
+
+function ridimensiona(){ renderer.setSize(canvas.clientWidth, canvas.clientHeight, false); }
+
+function disegna(){
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  if (moto && haDati) camera.quaternion.copy(qOff).multiply(qDev);
+  else camera.rotation.set(pitch, yaw, 0, 'YXZ');
+  if (vista === 'split') {
+    const hw = w / 2;
+    camera.aspect = hw / h; camera.fov = 85; camera.updateProjectionMatrix();
+    renderer.setScissorTest(true);
+    for (const [layer, x] of [[1, 0], [2, hw]]) {
+      camera.layers.set(layer);
+      renderer.setViewport(x, 0, hw, h); renderer.setScissor(x, 0, hw, h);
+      renderer.render(scena, camera);
+    }
+    renderer.setScissorTest(false);
+  } else {
+    camera.aspect = w / h; camera.fov = 75; camera.updateProjectionMatrix();
+    camera.layers.set(1);
+    renderer.setViewport(0, 0, w, h);
+    renderer.render(scena, camera);
+  }
+}
+
+function trascinamento(c){
+  let t = null;
+  c.addEventListener('pointerdown', e => {
+    if (video.paused && (video.srcObject || video.src)) video.play().catch(() => {});
+    t = { x: e.clientX, y: e.clientY, yaw, pitch }; c.setPointerCapture(e.pointerId);
+  });
+  c.addEventListener('pointermove', e => {
+    if (!t) return;
+    yaw = t.yaw + (e.clientX - t.x) * 0.005;
+    pitch = Math.max(-1.4, Math.min(1.4, t.pitch + (e.clientY - t.y) * 0.005));
+  });
+  c.addEventListener('pointerup', () => t = null);
+  c.addEventListener('pointercancel', () => t = null);
+}
+
+const E = new THREE.Euler(), Q1 = new THREE.Quaternion(-Math.sqrt(0.5), 0, 0, Math.sqrt(0.5));
+const Z = new THREE.Vector3(0, 0, 1), Y = new THREE.Vector3(0, 1, 0), Q0 = new THREE.Quaternion();
+handlers.orient = c => {
+  E.set(c.b, c.a, -c.g, 'YXZ');
+  qDev.setFromEuler(E); qDev.multiply(Q1);
+  qDev.multiply(Q0.setFromAxisAngle(Z, -(c.o || 0) * Math.PI / 180));
+  if (!haOff) {
+    const e = new THREE.Euler().setFromQuaternion(qDev, 'YXZ');
+    qOff.setFromAxisAngle(Y, -e.y); haOff = true;
+  }
+  haDati = true;
+};
+handlers.setMotion = c => { moto = !!c.on; haOff = false; haDati = false; };
+handlers.recenter = () => { haOff = false; yaw = 0; pitch = 0; };
+handlers.setFormat = c => { formato = c.value === 'tb' ? 'tb' : 'sbs'; costruisciSfere(); };
+handlers.setSwap = c => { scambia = !!c.on; costruisciSfere(); };
+handlers.setView = c => { vista = c.value === 'split' ? 'split' : 'drag'; };
+handlers.showFile = c => { $('file').hidden = !c.on; $('hint').style.visibility = c.on ? 'hidden' : ''; };
+handlers.restart = () => location.reload();
+
+function avviaPeerVisore(){
+  const codice = String(Math.floor(100000 + Math.random() * 900000));
+  peerV = new Peer(PREFISSO + codice);
+  peerV.on('open', () => { send({ type:'code', code: codice }); stato('In attesa di chiamata.'); });
+  peerV.on('error', e => {
+    if (e.type === 'unavailable-id') { peerV.destroy(); avviaPeerVisore(); }
+    else if (e.type !== 'peer-unavailable') { send({ type:'error', text:'Errore di collegamento (' + e.type + ').' }); }
+  });
+  peerV.on('disconnected', () => { if (!peerV.destroyed) peerV.reconnect(); });
+  peerV.on('connection', dc => {
+    canali[dc.peer] = dc;
+    dc.on('data', d => { if (d && d.t === 'cancel') annullata(dc.peer); });
+    dc.on('close', () => { if (canali[dc.peer] === dc) delete canali[dc.peer]; annullata(dc.peer); });
+  });
+  peerV.on('call', c => {
+    if (chiamataV || attesa) { c.close(); return; }
+    attesa = c;
+    send({ type:'incoming' });
+    stato('Chiamata in arrivo.');
+  });
+}
+
+function annullata(peer){
+  if (!attesa || attesa.peer !== peer) return;
+  attesa.close(); attesa = null;
+  send({ type:'ended' });
+  stato('Chiamata annullata da chi chiamava. In attesa di chiamata.');
+}
+
+handlers.answer = async () => {
+  if (!attesa) return;
+  try { micV = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true } }); }
+  catch { micV = null; stato('Microfono non disponibile: l\'altra persona non ti sentirà.'); }
+  if (!attesa) { if (micV) micV.getTracks().forEach(t => t.stop()); micV = null; return; }
+  const c = attesa; attesa = null; chiamataV = c;
+  c.answer(micV || undefined);
+  const pcV = c.peerConnection;
+  if (pcV) pcV.addEventListener('connectionstatechange', () => {
+    if (chiamataV !== c) return;
+    if (pcV.connectionState === 'connected') { send({ type:'connected' }); stato('Collegato: sei in chiamata 3D.'); }
+    if (pcV.connectionState === 'failed' || pcV.connectionState === 'closed') chiudiV();
+  });
+  c.on('stream', s => {
+    video.removeAttribute('src');
+    video.srcObject = s; video.muted = false;
+    hint('Collegamento video…');
+    video.play().catch(() => { if (chiamataV === c) hint('Tocca la scena per avviare il video'); });
+  });
+  c.on('close', chiudiV); c.on('error', chiudiV);
+};
+
+function chiudiV(){
+  const c = chiamataV; chiamataV = null;
+  if (c) c.close();
+  if (micV) micV.getTracks().forEach(t => t.stop());
+  micV = null; video.srcObject = null;
+  video.removeAttribute('src'); video.load();
+  mostraMedia(false);
+  hint('In attesa del video…');
+  send({ type:'ended' });
+  stato('Chiamata terminata. In attesa di chiamata.');
+}
+handlers.hangup = () => { if (chiamataV) chiudiV(); };
+handlers.decline = () => {
+  if (attesa) { const dc = canali[attesa.peer]; if (dc && dc.open) dc.send({ t:'decline' }); attesa.close(); attesa = null; }
+  send({ type:'ended' }); stato('Chiamata rifiutata. In attesa di chiamata.'); };
+
+$('fileProva').onchange = e => {
+  const f = e.target.files[0]; if (!f) return;
+  $('file').hidden = true;
+  if (chiamataV) { stato('Chiudi prima la chiamata per provare un video.'); return; }
+  video.srcObject = null;
+  mostraMedia(false);
+  video.src = URL.createObjectURL(f); video.loop = true; video.muted = false;
+  video.play().then(() => stato('Video di prova in riproduzione: ' + f.name))
+             .catch(() => { hint('Tocca la scena per avviare il video'); stato('Video caricato: tocca la scena per avviarlo.'); });
+  send({ type:'test', name: f.name });
+};
+
+/* =================== TRASMISSIONE =================== */
+let streamLocale = null, peerS = null, chiamataS = null, canaleS = null, timerSquillo = null;
+const cfg = { cam:'', mic:'', res:'3840x1920', bitrate:20000000 };
+let attivo = { cam:null, mic:null, res:null };
+
+async function avviaTrasmissione(){
+  canvas = $('stage'); canvas.hidden = true;
+  $('anteprima').hidden = false;
+  hint('Avvio della camera…');
+  try {
+    const tmp = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+    tmp.getTracks().forEach(t => t.stop());
+  } catch {
+    hint('Permesso camera negato');
+    send({ type:'permError', text:'Permesso per camera e microfono negato: abilitalo nelle impostazioni.' });
+    return;
+  }
+  await elenca();
+  navigator.mediaDevices.addEventListener('devicechange', elenca);
+  avviaAnteprima();
+}
+
+async function elenca(){
+  const d = await navigator.mediaDevices.enumerateDevices();
+  const cams = d.filter(x => x.kind === 'videoinput').map((x, i) => ({ id: x.deviceId, label: x.label || 'Camera ' + (i + 1) }));
+  const mics = d.filter(x => x.kind === 'audioinput').map((x, i) => ({ id: x.deviceId, label: x.label || 'Microfono ' + (i + 1) }));
+  if (!cams.find(c => c.id === cfg.cam)) cfg.cam = cams[0] ? cams[0].id : '';
+  if (!mics.find(m => m.id === cfg.mic)) cfg.mic = mics[0] ? mics[0].id : '';
+  send({ type:'devices', cams, mics, cam: cfg.cam, mic: cfg.mic });
+}
+
+async function avviaAnteprima(){
+  if (streamLocale) streamLocale.getTracks().forEach(t => t.stop());
+  const [w, h] = cfg.res.split('x').map(Number);
+  attivo = { cam: cfg.cam, mic: cfg.mic, res: cfg.res };
+  try {
+    streamLocale = await navigator.mediaDevices.getUserMedia({
+      video: { ...(cfg.cam ? { deviceId: { exact: cfg.cam } } : {}), width: { ideal: w }, height: { ideal: h }, frameRate: { ideal: 30 } },
+      audio: cfg.mic ? { deviceId: { exact: cfg.mic }, echoCancellation: true } : true
+    });
+  } catch (e) { streamLocale = null; stato('La camera non si avvia: ' + e.message); return; }
+  const vt = streamLocale.getVideoTracks()[0];
+  vt.contentHint = 'detail';
+  $('anteprima').srcObject = streamLocale;
+  hint(null);
+  const s = vt.getSettings();
+  send({ type:'resolution', w: s.width, h: s.height, requested: w });
+  stato('Camera pronta. Inserisci il codice del visore.');
+}
+
+handlers.config = c => {
+  Object.assign(cfg, c.cfg || {});
+  if (chiamataS) { impostaBitrate(chiamataS.peerConnection, Number(cfg.bitrate)); return; }
+  if (cfg.cam !== attivo.cam || cfg.mic !== attivo.mic || cfg.res !== attivo.res) avviaAnteprima();
+};
+
+function impostaBitrate(pc, bps){
+  if (!pc) return;
+  for (const snd of pc.getSenders()) {
+    if (!snd.track || snd.track.kind !== 'video') continue;
+    const p = snd.getParameters();
+    if (!p.encodings || !p.encodings.length) p.encodings = [{}];
+    p.encodings[0].maxBitrate = bps;
+    snd.setParameters(p).catch(() => {});
+  }
+}
+
+handlers.call = async c => {
+  const codice = String(c.code || '').trim();
+  if (!/^\d{6}$/.test(codice)) { stato('Il codice deve avere 6 cifre.'); send({ type:'ended' }); return; }
+  if (!streamLocale) { stato('Avvia prima la camera.'); send({ type:'ended' }); return; }
+  send({ type:'calling' });
+  stato('Chiamata in corso…');
+  try {
+    if (!peerS || peerS.destroyed) {
+      peerS = new Peer();
+      peerS.on('error', e => {
+        stato(e.type === 'peer-unavailable'
+          ? 'Codice non trovato: controlla che il visore mostri lo stesso codice.'
+          : 'Errore di collegamento (' + e.type + ').');
+        fineS();
+      });
+      await new Promise((ok, ko) => { peerS.once('open', ok); peerS.once('error', ko); });
+    }
+  } catch { return; }
+  canaleS = peerS.connect(PREFISSO + codice);
+  canaleS.on('data', d => { if (d && d.t === 'decline') { fineS(); stato('Chiamata rifiutata dal visore.'); } });
+  chiamataS = peerS.call(PREFISSO + codice, streamLocale);
+  stato('Squilla: attendi che risponda dal visore.');
+  timerSquillo = setTimeout(() => { if (chiamataS) { annullaS(); stato('Nessuna risposta dal visore.'); } }, 45000);
+  const pc = chiamataS.peerConnection;
+  pc.addEventListener('connectionstatechange', () => {
+    if (pc.connectionState === 'connected') {
+      clearTimeout(timerSquillo);
+      impostaBitrate(pc, Number(cfg.bitrate));
+      send({ type:'connected' });
+      stato('Collegato: sei in onda in 3D.');
+    }
+    if (pc.connectionState === 'failed') { fineS(); stato('Collegamento non riuscito: la rete potrebbe bloccare la connessione diretta.'); }
+  });
+  chiamataS.on('stream', r => { $('audioRemoto').srcObject = r; $('audioRemoto').play().catch(() => {}); });
+  const questa = chiamataS;
+  chiamataS.on('close', () => { if (chiamataS === questa) { fineS(); stato('Chiamata terminata.'); } });
+};
+
+function annullaS(){
+  if (canaleS && canaleS.open) { try { canaleS.send({ t:'cancel' }); } catch {} }
+  fineS();
+}
+function fineS(){
+  clearTimeout(timerSquillo);
+  const c = chiamataS; chiamataS = null;
+  if (c) c.close();
+  const dc = canaleS; canaleS = null;
+  if (dc) setTimeout(() => dc.close(), 300);
+  $('audioRemoto').srcObject = null;
+  send({ type:'ended' });
+}
+handlers.hangup = MODE === 'sender' ? () => { annullaS(); stato('Chiamata terminata.'); } : handlers.hangup;
+
+/* ---------- avvio ---------- */
+if (MODE === 'sender') { $('stage').hidden = true; avviaTrasmissione(); }
+else avviaVisore();
+send({ type:'ready', mode: MODE });
+</script>
+</body>
+</html>
