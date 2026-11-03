@@ -15,7 +15,10 @@ export type StageEvent =
   | { type: "test"; name: string | null }
   | { type: "devices"; cams: Device[]; mics: Device[]; cam: string; mic: string }
   | { type: "resolution"; w: number; h: number; requested: number }
-  | { type: "stats"; kbps: number; fps: number; w: number; h: number; rtt: number | null; loss: number };
+  | { type: "stats"; kbps: number; fps: number; w: number; h: number; rtt: number | null; loss: number }
+  | { type: "chat"; text: string }
+  | { type: "chatSent"; id: string }
+  | { type: "chatError"; id: string };
 
 export type StageHandle = { send: (c: StageCmd) => void; reload: () => void };
 

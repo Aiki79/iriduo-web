@@ -14,6 +14,7 @@
 - Native: expo-sensors DeviceMotion for looking around, expo-screen-orientation for landscape fullscreen, expo-camera permissions, recent codes stored locally
 
 ## Implemented (2026-06)
+- Chat during calls over the PeerJS data connection: quick replies + text, chat panel (viewer and sender), toasts over the video (doubled in split view), message box in fullscreen
 - Call history (/history, local storage): incoming/outgoing, duration, average quality, result, Richiama (auto-call), clear
 - Auto call from link/Richiama once the camera is ready (only once)
 - Procedural stereo 3D demos (Sfere, Tunnel, Stelle) as a CanvasTexture in the stage, no files needed

@@ -1,0 +1,31 @@
+{
+  "summary": "Tested the new 'Chat Durante Chiamata' feature end-to-end with two Playwright pages (chromium fake media, 375x667), over 4 runs. Everything requested works. Viewer->sender: the quick reply 'Ti vedo bene' showed up as viewer-chat-msg-me, as sender-chat-msg-them and as a sender-chat-toasts toast. The toast was gone after 9s. Typed messages work through the send button and through Enter. The send button is disabled when the field is empty, and the field clears after sending. Sender->viewer: viewer-chat-msg-them appears, plus a viewer-chat-toasts toast over the stage. Fullscreen: viewer-chat-fullscreen-button opens viewer-fullscreen-composer with the last 3 messages ('Tu:' prefix for my own) and the quick replies. Quick reply, typed message and send all reached the sender. Toasts are hidden while the composer is open and show again in fullscreen once it is closed. In split view + fullscreen each toast appears twice (left and right). Chat panels are hidden before connecting, while a call is ringing, and after hangup from either side (including the fullscreen hangup button). The message list is empty on a new call. Regression: viewer hangup, sender hangup, decline ('Chiamata rifiutata dal visore.'), stats cards and the history list all still work. No page errors. Deprecated packages detected: none (no expo-av, expo-barcode-scanner or expo-background-fetch).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "sender (live)", "issues": ["The sticky footer (sender-hangup-button) covers the bottom of the scroll view. When sender-chat-composer-send-button is scrolled to the bottom edge of the visible area, elementFromPoint at its center returns sender-hangup-button. A tap there would hang up the call instead of sending the message. The bottomOffset and paddingBottom settings handle the keyboard case, so this is low-risk. A forced test click did end a call this way, though."]},
+      {"screen": "viewer fullscreen composer (native landscape)", "issues": ["Could not be checked on web. In landscape with the keyboard open, the composer (3 messages + chip row + input, roughly 200px) plus the keyboard may cover the top fullBar or most of the 3D view. Check this on a device."]},
+      {"screen": "viewer fullscreen", "issues": ["Minor accessibility issue: viewer-chat-fullscreen-button has the accessibility label 'Messaggi' both when the composer is open (x icon) and when it is closed. Consider 'Chiudi messaggi' for the open state."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/.screenshots/s_toast.jpg", "/app/.screenshots/v_fs_composer.jpg", "/app/.screenshots/v_fs_toast.jpg", "/app/.screenshots/v_split_toast.jpg"],
+  "action_items": [
+    "Optional: stop the sticky sender footer from overlapping the tappable chat composer, e.g. add a bottom inset or scroll the composer above the bar when the input is focused.",
+    "Optional: check the viewer fullscreen composer in landscape with the keyboard open on a real device.",
+    "Optional: give viewer-chat-fullscreen-button a different accessibility label when the composer is open."
+  ],
+  "critical_code_review_comments": [
+    "stage.html: chat is only forwarded when the data channel belongs to the active call (chiamataV.peer === dc.peer / chiamataS). Text is limited to 300 characters on both sides, and a chatError is sent when the channel is not open. Good.",
+    "Bubbles use keys from newMessage ids. ChatToasts stops its interval correctly once no message is recent.",
+    "The viewer's PulsingAnswer keeps viewer-answer-button permanently 'not stable' for Playwright, so tests must click it with force=True. This does not affect users."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A", "frontend": "100%"},
+  "seed_data_creation": "None. Only TEST_ chat messages, which are ephemeral, and call history rows in the test browser's localStorage.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Two-peer setup: launch chromium with --use-fake-device-for-media-stream and --use-fake-ui-for-media-stream, open a 375x667 context with camera+microphone permissions, create viewer and sender pages, and start the call with sender?code=<code>. Click viewer-answer-button and viewer-decline-button with force=True (pulse animation). Click sender-chat-composer-send-button WITHOUT force: with force=True the click can land on the sticky sender-hangup-button and end the call. Chat testIDs: {viewer|sender}-chat, -chat-msg-me/them, -chat-composer-input/-send-button/-quick-N, -chat-toasts; viewer-chat-fullscreen-button, viewer-fullscreen-composer, viewer-fullscreen-chat-*."
+}

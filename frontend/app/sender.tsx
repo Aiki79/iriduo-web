@@ -7,6 +7,7 @@ import { KeyboardAwareScrollView, KeyboardStickyView } from "react-native-keyboa
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { StageView } from "@/src/components/StageView";
+import { ChatPanel, ChatToasts, newMessage, type ChatMessage } from "@/src/components/CallChat";
 import { CallPill, CallStatsCard, quality, type CallStatsData } from "@/src/components/CallStats";
 import { addCall, topQuality, type CallResult } from "@/src/history";
 import type { Device, StageEvent, StageHandle } from "@/src/components/stage-types";
@@ -113,6 +114,12 @@ function SenderBody() {
   const callRef = useRef<{ at: number; counts: Record<string, number> } | null>(null);
   const weakRef = useRef(0);
   const goodRef = useRef(0);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const sendChat = useCallback((text: string) => {
+    const m = newMessage("me", text);
+    setMessages((a) => [...a, m]);
+    stage.current?.send({ type: "chat", text, id: m.id });
+  }, []);
 
   useEffect(() => {
     getRecentCodes().then(setRecent);
@@ -217,7 +224,16 @@ function SenderBody() {
         case "connected":
           setPhase("live");
           setStartedAt((t) => t ?? Date.now());
-          if (!callRef.current) callRef.current = { at: Date.now(), counts: {} };
+          if (!callRef.current) {
+            callRef.current = { at: Date.now(), counts: {} };
+            setMessages([]);
+          }
+          break;
+        case "chat":
+          setMessages((a) => [...a, newMessage("them", e.text)]);
+          break;
+        case "chatError":
+          setMessages((a) => a.map((m) => (m.id === e.id ? { ...m, failed: true } : m)));
           break;
         case "ended": {
           setPhase("idle");
@@ -266,6 +282,7 @@ function SenderBody() {
     <View style={styles.flex}>
       <View style={styles.preview} testID="sender-preview-container">
         <StageView ref={stage} mode="sender" onEvent={onEvent} testID="sender-preview" />
+        {phase === "live" ? <ChatToasts messages={messages} testID="sender-chat-toasts" /> : null}
         {phase === "live" && (
           <View style={styles.liveBadge} testID="sender-live-badge">
             <View style={styles.liveDot} />
@@ -306,6 +323,7 @@ function SenderBody() {
             />
           </View>
         ) : null}
+        {phase === "live" ? <ChatPanel messages={messages} onSend={sendChat} testID="sender-chat" /> : null}
 
         <Label>Codice mostrato sul visore</Label>
         <TextInput

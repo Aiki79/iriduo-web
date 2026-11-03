@@ -5,11 +5,13 @@ import * as ScreenOrientation from "expo-screen-orientation";
 import { DeviceMotion } from "expo-sensors";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Linking, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Linking, Platform, StyleSheet, Text, View } from "react-native";
+import { KeyboardAwareScrollView, KeyboardStickyView } from "react-native-keyboard-controller";
 import Animated, { FadeIn, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { StageView } from "@/src/components/StageView";
+import { ChatComposer, ChatPanel, ChatToasts, newMessage, type ChatMessage } from "@/src/components/CallChat";
 import { CallPill, CallStatsCard, quality, type CallStatsData } from "@/src/components/CallStats";
 import { addCall, topQuality } from "@/src/history";
 import { ShareCode } from "@/src/components/ShareCode";
@@ -55,12 +57,23 @@ export default function Viewer() {
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [stats, setStats] = useState<CallStatsData | null>(null);
   const [testing, setTesting] = useState<string | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [composerOpen, setComposerOpen] = useState(false);
   const codeRef = useRef<string>("");
   const callRef = useRef<{ at: number; counts: Record<string, number> } | null>(null);
   const incomingRef = useRef(false);
   const declinedRef = useRef(false);
 
   const send = useCallback((c: { type: string; [k: string]: unknown }) => stage.current?.send(c), []);
+
+  const sendChat = useCallback(
+    (text: string) => {
+      const m = newMessage("me", text);
+      setMessages((a) => [...a, m]);
+      send({ type: "chat", text, id: m.id });
+    },
+    [send],
+  );
 
   const onEvent = useCallback(
     (e: StageEvent) => {
@@ -96,12 +109,23 @@ export default function Viewer() {
           setTestOpen(false);
           setTesting(null);
           setStartedAt((t) => t ?? Date.now());
-          if (!callRef.current) callRef.current = { at: Date.now(), counts: {} };
+          if (!callRef.current) {
+            callRef.current = { at: Date.now(), counts: {} };
+            setMessages([]);
+          }
           incomingRef.current = false;
+          break;
+        case "chat":
+          setMessages((a) => [...a, newMessage("them", e.text)]);
+          if (!isWeb) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          break;
+        case "chatError":
+          setMessages((a) => a.map((m) => (m.id === e.id ? { ...m, failed: true } : m)));
           break;
         case "ended": {
           setPhase("waiting");
           setFull(false);
+          setComposerOpen(false);
           setStartedAt(null);
           setStats(null);
           const c = callRef.current;
@@ -233,12 +257,21 @@ export default function Viewer() {
         testID="viewer-stage-container"
       >
         <StageView ref={stage} mode="viewer" onEvent={onEvent} testID="viewer-stage" />
+        {phase === "connected" && !composerOpen ? <ChatToasts messages={messages} split={full && view === "split"} testID="viewer-chat-toasts" /> : null}
         {full ? (
           <View style={[styles.fullBar, { top: Math.max(insets.top, spacing.md), left: Math.max(insets.left, spacing.md), right: Math.max(insets.right, spacing.md) }]}>
             <IconBtn icon="minimize-2" label="Esci da schermo intero" testID="viewer-exit-fullscreen-button" onPress={() => setFull(false)} />
             {startedAt && phase === "connected" ? <CallPill startedAt={startedAt} stats={stats} testID="viewer-call-pill" /> : null}
             <View style={styles.row}>
               {motion && <IconBtn icon="crosshair" label="Ricentra" testID="viewer-recenter-fullscreen-button" onPress={() => send({ type: "recenter" })} />}
+              {phase === "connected" && (
+                <IconBtn
+                  icon={composerOpen ? "x" : "message-circle"}
+                  label={composerOpen ? "Chiudi messaggi" : "Messaggi"}
+                  testID="viewer-chat-fullscreen-button"
+                  onPress={() => setComposerOpen((o) => !o)}
+                />
+              )}
               {inCall && (
                 <IconBtn icon="phone-off" label="Chiudi chiamata" testID="viewer-hangup-fullscreen-button" onPress={() => send({ type: "hangup" })} />
               )}
@@ -249,10 +282,31 @@ export default function Viewer() {
             <IconBtn icon="maximize-2" label="Schermo intero" testID="viewer-fullscreen-button" onPress={() => setFull(true)} />
           </View>
         )}
+        {full && composerOpen && phase === "connected" ? (
+          <KeyboardStickyView
+            style={[styles.fullComposer, { left: Math.max(insets.left, spacing.md), right: Math.max(insets.right, spacing.md), bottom: Math.max(insets.bottom, spacing.md) }]}
+          >
+            <View style={styles.fullComposerInner} testID="viewer-fullscreen-composer">
+              {messages.slice(-3).map((m) => (
+                <Text key={m.id} style={[styles.fullMsg, m.from === "me" && styles.fullMsgMe]} numberOfLines={2}>
+                  {m.from === "me" ? "Tu: " : ""}
+                  {m.text}
+                </Text>
+              ))}
+              <ChatComposer onSend={sendChat} testID="viewer-fullscreen-chat" />
+            </View>
+          </KeyboardStickyView>
+        ) : null}
       </View>
 
       {!full && (
-        <ScrollView style={styles.flex} contentContainerStyle={[styles.controls, { paddingBottom: insets.bottom + spacing.xl }]} testID="viewer-controls">
+        <KeyboardAwareScrollView
+          bottomOffset={spacing.lg}
+          keyboardShouldPersistTaps="handled"
+          style={styles.flex}
+          contentContainerStyle={[styles.controls, { paddingBottom: insets.bottom + spacing.xl }]}
+          testID="viewer-controls"
+        >
           {inCall && (
             <Btn testID="viewer-hangup-button" label="Chiudi chiamata" icon="phone-off" variant="danger" onPress={() => send({ type: "hangup" })} style={styles.mt} />
           )}
@@ -261,6 +315,7 @@ export default function Viewer() {
               <CallStatsCard startedAt={startedAt} stats={stats} direction="in" testID="viewer-call-stats" />
             </View>
           ) : null}
+          {phase === "connected" ? <ChatPanel messages={messages} onSend={sendChat} testID="viewer-chat" /> : null}
 
           <Label>Come guardare</Label>
           <ChipRow testID="viewer-view-chips">
@@ -323,7 +378,7 @@ export default function Viewer() {
             style={styles.mt}
           />
           {testOpen && <Text style={[styles.small, styles.mt]}>Tocca il riquadro nella scena qui sopra per scegliere il video.</Text>}
-        </ScrollView>
+        </KeyboardAwareScrollView>
       )}
     </View>
   );
@@ -353,6 +408,10 @@ const styles = StyleSheet.create({
   stageFull: { flex: 1, backgroundColor: colors.stage },
   stageBtn: { position: "absolute", top: spacing.sm, right: spacing.sm },
   fullBar: { position: "absolute", flexDirection: "row", justifyContent: "space-between", alignItems: "center", opacity: 0.85 },
+  fullComposer: { position: "absolute" },
+  fullComposerInner: { backgroundColor: colors.scrim, borderRadius: radius.md, padding: spacing.sm, gap: spacing.xs },
+  fullMsg: { fontFamily: fonts.regular, fontSize: 14, color: colors.onSurface },
+  fullMsgMe: { color: colors.brandPrimary },
   controls: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
   tip: {
     flexDirection: "row",

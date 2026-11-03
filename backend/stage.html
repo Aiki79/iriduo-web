@@ -315,7 +315,10 @@ function avviaPeerVisore(){
     dc.on('open', () => {
       if (rifiutiInSospeso.has(dc.peer)) { rifiutiInSospeso.delete(dc.peer); try { dc.send({ t:'decline' }); } catch {} }
     });
-    dc.on('data', d => { if (d && d.t === 'cancel' && canali[dc.peer] === dc) annullata(dc.peer); });
+    dc.on('data', d => {
+      if (d && d.t === 'cancel' && canali[dc.peer] === dc) annullata(dc.peer);
+      if (d && d.t === 'chat' && chiamataV && chiamataV.peer === dc.peer) send({ type:'chat', text: String(d.text || '').slice(0, 300) });
+    });
     dc.on('close', () => { if (canali[dc.peer] !== dc) return; delete canali[dc.peer]; annullata(dc.peer); });
   });
   peerV.on('call', c => {
@@ -486,7 +489,10 @@ handlers.call = async c => {
     return;
   }
   canaleS = peerS.connect(PREFISSO + codice);
-  canaleS.on('data', d => { if (d && d.t === 'decline') { stato('Chiamata rifiutata dal visore.'); fineS(); } });
+  canaleS.on('data', d => {
+    if (d && d.t === 'decline') { stato('Chiamata rifiutata dal visore.'); fineS(); }
+    if (d && d.t === 'chat' && chiamataS) send({ type:'chat', text: String(d.text || '').slice(0, 300) });
+  });
   chiamataS = peerS.call(PREFISSO + codice, streamLocale);
   stato('Squilla: attendi che risponda dal visore.');
   timerSquillo = setTimeout(() => { if (chiamataS) { stato('Nessuna risposta dal visore.'); annullaS(); } }, 45000);
@@ -521,6 +527,14 @@ function fineS(){
   send({ type:'ended' });
 }
 handlers.hangup = MODE === 'sender' ? () => { annullaS(); stato('Chiamata terminata.'); } : handlers.hangup;
+
+/* ---------- chat durante la chiamata ---------- */
+handlers.chat = c => {
+  const text = String(c.text || '').slice(0, 300);
+  const dc = MODE === 'sender' ? (chiamataS ? canaleS : null) : (chiamataV ? canali[chiamataV.peer] : null);
+  if (text && dc && dc.open) { try { dc.send({ t:'chat', text }); send({ type:'chatSent', id: c.id }); return; } catch {} }
+  send({ type:'chatError', id: c.id });
+};
 
 /* ---------- avvio ---------- */
 if (MODE === 'sender') { $('stage').hidden = true; avviaTrasmissione(); }
