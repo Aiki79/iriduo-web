@@ -14,6 +14,7 @@
 - Native: expo-sensors DeviceMotion for looking around, expo-screen-orientation for landscape fullscreen, expo-camera permissions, recent codes stored locally
 
 ## Implemented (2026-06)
+- Share code (viewer): WhatsApp (wa.me), SMS (sms: body), Other (system share sheet) buttons under the code, with a ready-made Italian message
 - App icon from the user's image (IMG_2031): rounded corners filled and saved as 1024 icon, Android adaptive icon (background #243757), splash and favicon. Logo shown on the home screen
 - Home with two roles; dark theme taken from the HTML; Atkinson Hyperlegible font
 - Viewer: 6-digit code, status, Answer/Decline, drag view or split view, phone motion, recentre, landscape fullscreen, SBS/TB format, eye swap, test video

@@ -10,6 +10,7 @@ import Animated, { FadeIn, useAnimatedStyle, useSharedValue, withRepeat, withTim
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { StageView } from "@/src/components/StageView";
+import { ShareCode } from "@/src/components/ShareCode";
 import type { StageEvent, StageHandle } from "@/src/components/stage-types";
 import { Btn, Chip, ChipRow, Header, IconBtn, Label, StatusBox, Toggle } from "@/src/components/ui";
 import { colors, fonts, radius, spacing } from "@/src/theme";
@@ -156,6 +157,7 @@ export default function Viewer() {
             <Text style={styles.code} testID="viewer-code" selectable>
               {code ?? "······"}
             </Text>
+            <ShareCode code={code} />
           </View>
           <StatusBox testID="viewer-status" text={status} tone={phase === "error" ? "error" : phase === "connected" ? "success" : "info"} />
           {phase === "incoming" && (
@@ -266,7 +268,7 @@ const styles = StyleSheet.create({
   top: { paddingHorizontal: spacing.lg, gap: spacing.md },
   codeCard: { backgroundColor: colors.surfaceSecondary, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: spacing.lg },
   codeLabel: { fontFamily: fonts.regular, fontSize: 15, color: colors.muted },
-  code: { fontFamily: fonts.bold, fontSize: 52, letterSpacing: 8, color: colors.brandPrimary, marginTop: spacing.xs },
+  code: { fontFamily: fonts.bold, fontSize: 48, letterSpacing: 8, color: colors.brandPrimary, marginTop: spacing.xs },
   incoming: { flexDirection: "row", gap: spacing.md },
   micRow: { gap: spacing.sm, marginTop: spacing.sm },
   small: { fontFamily: fonts.regular, fontSize: 15, color: colors.muted, lineHeight: 21 },
