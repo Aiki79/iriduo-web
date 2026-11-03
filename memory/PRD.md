@@ -14,11 +14,11 @@
 - Native: expo-sensors DeviceMotion for looking around, expo-screen-orientation for landscape fullscreen, expo-camera permissions, recent codes stored locally
 
 ## Implemented (2026-06)
+- App icon from the user's image (IMG_2031): rounded corners filled and saved as 1024 icon, Android adaptive icon (background #243757), splash and favicon. Logo shown on the home screen
 - Home with two roles; dark theme taken from the HTML; Atkinson Hyperlegible font
 - Viewer: 6-digit code, status, Answer/Decline, drag view or split view, phone motion, recentre, landscape fullscreen, SBS/TB format, eye swap, test video
 - Sender: permission gate, choice of camera, microphone, resolution and bitrate, preview, code entry, recent codes, Call/Cancel/Hang up, live badge
 - Decline/cancel signalling over a PeerJS data connection, 45s ring timeout
 
 ## Backlog
-- P1: app icon (waiting for the image from the user)
 - P2: call duration timer, sharing the code, call history

@@ -39,7 +39,7 @@ export default function Home() {
       <ScrollView contentContainerStyle={[styles.content, { paddingTop: insets.top + spacing["3xl"], paddingBottom: insets.bottom + spacing.xl }]}>
         <Animated.View entering={FadeInDown.duration(420)}>
           <View style={styles.badge}>
-            <Feather name="aperture" size={16} color={colors.brandPrimary} />
+            <Image source={require("../assets/images/icon.png")} style={styles.logo} testID="home-logo" />
             <Text style={styles.badgeText}>VIDEOCHIAMATA 3D</Text>
           </View>
           <Text style={styles.title} testID="home-title">
@@ -85,7 +85,8 @@ const styles = StyleSheet.create({
   hero: { position: "absolute", top: 0, left: 0, right: 0, height: 420 },
   flex: { flex: 1 },
   content: { paddingHorizontal: spacing.xl, flexGrow: 1 },
-  badge: { flexDirection: "row", alignItems: "center", gap: spacing.sm, marginBottom: spacing.md },
+  badge: { flexDirection: "row", alignItems: "center", gap: spacing.md, marginBottom: spacing.lg },
+  logo: { width: 56, height: 56, borderRadius: radius.md },
   badgeText: { fontFamily: fonts.bold, fontSize: 13, letterSpacing: 1.6, color: colors.brandPrimary },
   title: { fontFamily: fonts.bold, fontSize: 40, color: colors.onSurface, lineHeight: 46 },
   lead: { fontFamily: fonts.regular, fontSize: 18, color: colors.muted, lineHeight: 26, marginTop: spacing.md, maxWidth: 440 },
