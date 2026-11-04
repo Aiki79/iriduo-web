@@ -41,7 +41,7 @@ def make(src, dst, bx, cy, r, rx):
     s = 4
     S = (W * s, H * s)
     X, Y, R, RX = bx * s, cy * s, r * s, rx * s
-    T, t = R * 0.045, R * 0.012  # thick / thin stroke
+    T, t = R * 0.075, R * 0.02  # thick / thin stroke
 
     # --- visor (blue head): outer frame, two lens outlines, strap stub
     w, h = R * 1.0, R * 0.66
@@ -63,18 +63,18 @@ def make(src, dst, bx, cy, r, rx):
     vmask = ImageChops.multiply(vmask, head)
 
     # --- eyes (red head): almond outline + small pupil ring
-    er = R * 0.22
+    er = R * 0.2
     ey = Y - R * 0.1
     centres = (RX - R * 0.38, RX + R * 0.38)
 
     def eyes(d, sw):
-        # stylized eye: a single soft lid curve, no pupil
         sw = max(1, int(sw))
         for ex in centres:
-            d.arc((ex - er, ey - er * 0.55, ex + er, ey + er * 0.95), 200, 340, fill=255, width=sw)
+            d.ellipse((ex - er, ey - er * 0.72, ex + er, ey + er * 0.72), outline=255, width=sw)
+            d.ellipse((ex - er * 0.32, ey - er * 0.32, ex + er * 0.32, ey + er * 0.32), fill=255)
 
     ew = ramp(S, RX - R * 0.6, RX + R * 0.55, 0, 255)  # thick on the outer (right) side
-    emask = blend_widths(S, eyes, T * 1.1, t, ew)
+    emask = blend_widths(S, eyes, T * 0.8, t, ew)
     emask = ImageChops.multiply(emask, ramp(S, RX - R * 0.65, RX + R * 0.15, 90, 255))
 
     mask = ImageChops.lighter(vmask, emask).resize((W, H), Image.LANCZOS)
