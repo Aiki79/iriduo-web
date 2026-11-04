@@ -6,21 +6,23 @@ import Animated, { FadeInUp, FadeOut } from "react-native-reanimated";
 import { Chip, ChipRow } from "@/src/components/ui";
 import { colors, fonts, radius, spacing } from "@/src/theme";
 
-export type ChatMessage = { id: string; from: "me" | "them"; text: string; at: number; failed?: boolean };
+export type ChatMessage = { id: string; from: "me" | "them"; text: string; at: number; failed?: boolean; label?: string };
 
 export const QUICK_REPLIES = ["Ti vedo bene", "Non ti sento", "Avvicinati", "Allontanati", "Va bene!", "Un attimo…"];
 
-export const newMessage = (from: "me" | "them", text: string): ChatMessage => ({
+export const newMessage = (from: "me" | "them", text: string, label?: string): ChatMessage => ({
   id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
   from,
   text,
   at: Date.now(),
+  label,
 });
 
 function Bubble({ m, testID }: { m: ChatMessage; testID: string }) {
   const me = m.from === "me";
   return (
     <View style={[styles.bubble, me ? styles.me : styles.them]} testID={testID}>
+      {!me && m.label ? <Text style={styles.label}>{m.label}</Text> : null}
       <Text style={[styles.bubbleText, { color: me ? colors.onBrandPrimary : colors.onSurface }]}>{m.text}</Text>
       {m.failed ? <Text style={styles.failed}>Non inviato</Text> : null}
     </View>
@@ -111,6 +113,7 @@ export function ChatToasts({ messages, split, testID, bottom }: { messages: Chat
         <Animated.View key={m.id} entering={FadeInUp.duration(250)} exiting={FadeOut} style={styles.toast}>
           <Feather name="message-circle" size={14} color={colors.brandPrimary} />
           <Text style={styles.toastText} numberOfLines={3}>
+            {m.label ? `${m.label}: ` : ""}
             {m.text}
           </Text>
         </Animated.View>
@@ -130,10 +133,11 @@ const styles = StyleSheet.create({
   panelTitle: { fontFamily: fonts.bold, fontSize: 16, color: colors.onSurface },
   empty: { fontFamily: fonts.regular, fontSize: 14, color: colors.muted, lineHeight: 20 },
   list: { gap: spacing.xs },
-  bubble: { maxWidth: "85%", borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+  bubble: { maxWidth: "85%", flexShrink: 1, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   me: { alignSelf: "flex-end", backgroundColor: colors.brandPrimary },
   them: { alignSelf: "flex-start", backgroundColor: colors.surfaceTertiary, borderWidth: 1, borderColor: colors.border },
   bubbleText: { fontFamily: fonts.regular, fontSize: 15, lineHeight: 20 },
+  label: { fontFamily: fonts.bold, fontSize: 12, color: colors.brandPrimary, marginBottom: 2 },
   failed: { fontFamily: fonts.bold, fontSize: 11, color: colors.error, marginTop: 2 },
   inputRow: { flexDirection: "row", gap: spacing.sm, alignItems: "center" },
   input: {

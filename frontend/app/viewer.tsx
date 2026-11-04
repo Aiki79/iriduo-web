@@ -7,7 +7,7 @@ import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocalSearchParams } from "expo-router";
 import { storage } from "@/src/utils/storage";
-import { Linking, Platform, StyleSheet, Text, View } from "react-native";
+import { AppState, Linking, Platform, StyleSheet, Text, View } from "react-native";
 import { KeyboardAwareScrollView, KeyboardStickyView } from "react-native-keyboard-controller";
 import Animated, { FadeIn, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -15,7 +15,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StageView } from "@/src/components/StageView";
 import { ChatComposer, ChatPanel, ChatToasts, newMessage, type ChatMessage } from "@/src/components/CallChat";
 import { ReactionBar } from "@/src/components/Reactions";
-import { ChunkReceiver, readMemoryBase64, saveAndShare } from "@/src/media";
+import { ChunkReceiver, readMemoryBase64, saveAndShare, sendVideoFile } from "@/src/media";
 import { CallPill, CallStatsCard, formatDuration, quality, type CallStatsData } from "@/src/components/CallStats";
 import { addCall, topQuality } from "@/src/history";
 import { ShareCode } from "@/src/components/ShareCode";
@@ -47,7 +47,7 @@ function PulsingAnswer({ onPress }: { onPress: () => void }) {
 export default function Viewer() {
   const insets = useSafeAreaInsets();
   const stage = useRef<StageHandle>(null);
-  const { photo } = useLocalSearchParams<{ photo?: string }>();
+  const { photo, video } = useLocalSearchParams<{ photo?: string; video?: string }>();
   const [fixedOn, setFixedOn] = useState<boolean | null>(null);
   const [initQuery, setInitQuery] = useState<string | undefined>(undefined);
   const fixedOnRef = useRef(false);
@@ -78,6 +78,28 @@ export default function Viewer() {
   const [micPerm, requestMic] = useMicrophonePermissions();
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [stats, setStats] = useState<CallStatsData | null>(null);
+  // Presence: lets callers who already know this code see it is "in attesa"
+  const [appActive, setAppActive] = useState(true);
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (s) => setAppActive(s === "active"));
+    return () => sub.remove();
+  }, []);
+  useEffect(() => {
+    if (!code || phase !== "waiting" || !appActive) return;
+    const base = `${process.env.EXPO_PUBLIC_BACKEND_URL}/api/presence`;
+    const leave = () => fetch(`${base}/${code}`, { method: "DELETE", keepalive: true }).catch(() => {});
+    const ping = () =>
+      fetch(base, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code }) }).catch(() => {});
+    ping();
+    const id = setInterval(ping, 20000);
+    if (isWeb) window.addEventListener("pagehide", leave);
+    return () => {
+      clearInterval(id);
+      if (isWeb) window.removeEventListener("pagehide", leave);
+      leave();
+    };
+  }, [code, phase, appActive]);
+
   const [testing, setTesting] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [composerOpen, setComposerOpen] = useState(false);
@@ -117,6 +139,12 @@ export default function Viewer() {
           send({ type: "setSwap", on: swap });
           send({ type: "setView", value: view });
           send({ type: "setMotion", on: motion });
+          if (video && !isWeb) {
+            setMediaMsg({ text: "Carico la registrazione…", tone: "info" });
+            sendVideoFile(video, (c) => send(c))
+              .then(() => setMediaMsg({ text: `Registrazione: ${video}`, tone: "success" }))
+              .catch(() => setMediaMsg({ text: "Non riesco ad aprire la registrazione.", tone: "error" }));
+          }
           if (photo && !isWeb) {
             readMemoryBase64(photo)
               .then((data) => {
@@ -165,7 +193,7 @@ export default function Viewer() {
           incomingRef.current = false;
           break;
         case "chat":
-          setMessages((a) => [...a, newMessage("them", e.text)]);
+          setMessages((a) => [...a, newMessage("them", e.text, e.from ? `Visore ${e.from}` : undefined)]);
           if (!isWeb) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           break;
         case "snapshot":

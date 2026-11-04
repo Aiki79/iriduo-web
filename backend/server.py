@@ -13,7 +13,8 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 from typing import List
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+import re
 
 
 ROOT_DIR = Path(__file__).parent
@@ -29,6 +30,10 @@ INDEXES: dict[str, list[IndexModel]] = {
     "status_checks": [
         IndexModel([("id", ASCENDING)], name="id", unique=True),
         IndexModel([("timestamp", DESCENDING)], name="timestamp_desc"),
+    ],
+    "presence": [
+        IndexModel([("code", ASCENDING)], name="code", unique=True),
+        IndexModel([("updated_at", ASCENDING)], name="updated_at_ttl", expireAfterSeconds=120),
     ],
 }
 
@@ -81,6 +86,34 @@ async def get_status_checks(limit: int = Query(20, ge=1, le=100)):
     return [StatusCheck(**status_check) for status_check in status_checks]
 
 STAGE_HTML = ROOT_DIR / "stage.html"
+
+
+# ---------- presence: "in attesa" status for codes the caller already knows ----------
+class PresenceIn(BaseModel):
+    code: str = Field(pattern=r"^\d{6}$")
+
+
+@api_router.post("/presence")
+async def presence_ping(body: PresenceIn):
+    await db.presence.update_one({"code": body.code}, {"$set": {"code": body.code, "updated_at": datetime.now(timezone.utc)}}, upsert=True)
+    return {"ok": True}
+
+
+@api_router.delete("/presence/{code}")
+async def presence_leave(code: str):
+    if re.fullmatch(r"\d{6}", code):
+        await db.presence.delete_one({"code": code})
+    return {"ok": True}
+
+
+@api_router.get("/presence")
+async def presence_check(codes: str = Query("", max_length=200)):
+    wanted = [c for c in codes.split(",") if re.fullmatch(r"\d{6}", c)][:20]
+    if not wanted:
+        return {"online": []}
+    since = datetime.now(timezone.utc) - timedelta(seconds=45)
+    docs = await db.presence.find({"code": {"$in": wanted}, "updated_at": {"$gte": since}}, {"_id": 0, "code": 1}).to_list(20)
+    return {"online": [d["code"] for d in docs]}
 
 
 @api_router.get("/stage", include_in_schema=False)

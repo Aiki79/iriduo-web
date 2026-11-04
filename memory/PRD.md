@@ -14,6 +14,13 @@
 - Native: expo-sensors DeviceMotion for looking around, expo-screen-orientation for landscape fullscreen, expo-camera permissions, recent codes stored locally
 
 ## Implemented (2026-06)
+- Slogan "BiLume — a tu per tu, in 3D" / "face to face, in 3D" on home, welcome, share message and join page
+- Presence: TTL/unique indexes in INDEXES, leave on background (AppState) and pagehide (keepalive); main viewer excluded from guest suggestions
+- App renamed **BiLume** (app.json name, home, welcome, share message, join page). Bundle identifier unchanged
+- Group chat: the sender forwards each viewer's messages to the other viewers (label "Visore X" / contact name)
+- Waiting room: /api/presence (POST ping every 20s from a waiting viewer, DELETE on leave, GET ?codes= only for known codes, TTL 120s). The sender shows "In attesa ora" with one-tap call, plus online suggestions in the guest panel
+- Gallery videos in 3D: the recording is sent to the stage in base64 chunks (vidChunk) and played on the 3D sphere
+- Pro: RevenueCat still not connected (oauth_pending)
 - Memories gallery (/gallery, native only): photos and recordings saved in document/ricordi; view photos in 3D in the viewer (/viewer?photo=), share, delete with confirmation
 - Fixed code: viewer toggle; the code is reused through the ?fixed= stage param; falls back to a new code if taken (codeTaken); "Nuovo codice"/flood replace it
 - Multiple invites: the sender adds up to 3 more viewers (addGuest/removeGuest) once live; chat/reactions go to everyone, bitrate applies to each
@@ -41,3 +48,8 @@
 
 ## Backlog
 - P2: call duration timer, sharing the code, call history
+
+## Jun 2026 - UI polish
+- Rubrica: nomi lunghi troncati, pulsanti sempre visibili (testato a 320px)
+- Pannello ospiti: nomi e chip troncati su schermi piccoli
+- Chat mittente: spazio extra sotto la chat per non toccare per errore 'Chiudi chiamata'

@@ -52,7 +52,13 @@ export default function Home() {
             <Text style={styles.badgeText}>VIDEOCHIAMATA 3D</Text>
           </View>
           <Text style={styles.title} testID="home-title">
-            Chiamata VR180
+            BiLume
+          </Text>
+          <Text style={styles.slogan} testID="home-slogan">
+            a tu per tu, in 3D
+          </Text>
+          <Text style={styles.sloganEn} testID="home-slogan-en">
+            face to face, in 3D
           </Text>
           <Text style={styles.lead}>
             Chi trasmette usa una camera VR180 a doppio obiettivo, chi guarda usa il visore o il telefono.
@@ -104,7 +110,7 @@ export default function Home() {
         <Animated.View entering={FadeInDown.delay(320).duration(420)} style={styles.note} testID="home-compat-note">
           <Feather name="info" size={18} color={colors.muted} />
           <Text style={styles.noteText}>
-            Compatibile con la pagina Chiamata VR180 aperta sul Meta Quest: stessi codici a 6 cifre.
+            Compatibile con la pagina Chiamata VR180 sul Meta Quest: stessi codici a 6 cifre.
           </Text>
         </Animated.View>
       </ScrollView>
@@ -120,6 +126,8 @@ const styles = StyleSheet.create({
   badge: { flexDirection: "row", alignItems: "center", gap: spacing.md, marginBottom: spacing.lg },
   logo: { width: 56, height: 56, borderRadius: radius.md },
   badgeText: { fontFamily: fonts.bold, fontSize: 13, letterSpacing: 1.6, color: colors.brandPrimary },
+  slogan: { fontFamily: fonts.bold, fontSize: 22, color: colors.brandPrimary, marginTop: spacing.xs },
+  sloganEn: { fontFamily: fonts.regular, fontSize: 15, fontStyle: "italic", color: colors.muted, marginTop: 2 },
   title: { fontFamily: fonts.bold, fontSize: 40, color: colors.onSurface, lineHeight: 46 },
   lead: { fontFamily: fonts.regular, fontSize: 18, color: colors.muted, lineHeight: 26, marginTop: spacing.md, maxWidth: 440 },
   cards: { gap: spacing.lg, marginTop: spacing["2xl"] },

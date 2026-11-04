@@ -55,6 +55,24 @@ export async function readMemoryBase64(name: string) {
   return new File(galleryDir(), name).base64();
 }
 
+const toB64 = (u: Uint8Array) => {
+  let s = "";
+  for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode(...u.subarray(i, i + 0x8000));
+  return btoa(s);
+};
+
+/** Streams a saved recording to the 3D stage in base64 chunks (the stage cannot read local files). */
+export async function sendVideoFile(name: string, send: (c: { type: string; [k: string]: unknown }) => void) {
+  const bytes = await new File(galleryDir(), name).bytes();
+  const CH = 3 * 128 * 1024;
+  const n = Math.ceil(bytes.length / CH);
+  const mime = /\.mp4$/i.test(name) ? "video/mp4" : "video/webm";
+  for (let i = 0; i < n; i++) {
+    send({ type: "vidChunk", i, n, mime, data: toB64(bytes.subarray(i * CH, (i + 1) * CH)) });
+    await new Promise((r) => setTimeout(r, 15));
+  }
+}
+
 /** Receives a recording in ordered base64 chunks, keeps it in the gallery and shares it when complete. */
 export class ChunkReceiver {
   private file: File | null = null;

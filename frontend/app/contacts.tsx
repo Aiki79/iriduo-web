@@ -137,7 +137,7 @@ export default function Contacts() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.surface },
-  flex: { flex: 1 },
+  flex: { flex: 1, minWidth: 0 },
   content: { paddingHorizontal: spacing.lg, gap: spacing.sm },
   form: { gap: spacing.sm, backgroundColor: colors.surfaceSecondary, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, padding: spacing.md, paddingTop: 0 },
   input: {
@@ -154,7 +154,7 @@ const styles = StyleSheet.create({
   codeInput: { fontFamily: fonts.bold, letterSpacing: 4 },
   error: { fontFamily: fonts.bold, fontSize: 14, color: colors.error },
   notice: { fontFamily: fonts.bold, fontSize: 14, color: colors.success },
-  delConfirm: { width: 76, backgroundColor: colors.error },
+  delConfirm: { width: 76, flexShrink: 0, backgroundColor: colors.error },
   delText: { fontFamily: fonts.bold, fontSize: 13, color: colors.onError },
   hint: { fontFamily: fonts.regular, fontSize: 14, color: colors.muted, lineHeight: 20 },
   row: { flexDirection: "row", alignItems: "center", gap: spacing.md, backgroundColor: colors.surfaceSecondary, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, padding: spacing.md },

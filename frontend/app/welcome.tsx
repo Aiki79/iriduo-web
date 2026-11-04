@@ -44,7 +44,12 @@ export default function Welcome() {
   return (
     <View style={[styles.root, { paddingTop: insets.top + spacing.lg, paddingBottom: insets.bottom + spacing.xl }]} testID="welcome-screen">
       <View style={styles.top}>
-        <Text style={styles.brand}>CHIAMATA VR180</Text>
+        <View>
+          <Text style={styles.brand}>BILUME</Text>
+          <Text style={styles.slogan} testID="welcome-slogan">
+            a tu per tu, in 3D · face to face, in 3D
+          </Text>
+        </View>
         <Pressable testID="welcome-skip-button" onPress={done} hitSlop={10} style={styles.skip}>
           <Text style={styles.skipText}>Salta</Text>
         </Pressable>
@@ -83,6 +88,7 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.surface, paddingHorizontal: spacing.xl },
   top: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   brand: { fontFamily: fonts.bold, fontSize: 13, letterSpacing: 1.6, color: colors.brandPrimary },
+  slogan: { fontFamily: fonts.regular, fontSize: 13, color: colors.muted, marginTop: 2 },
   skip: { minHeight: 44, justifyContent: "center", paddingHorizontal: spacing.sm },
   skipText: { fontFamily: fonts.bold, fontSize: 16, color: colors.muted },
   body: { flex: 1, justifyContent: "center", gap: spacing.lg },

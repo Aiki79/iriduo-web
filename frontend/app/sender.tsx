@@ -134,6 +134,25 @@ function SenderBody() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [guests, setGuests] = useState<Record<string, string>>({});
+  const [online, setOnline] = useState<string[]>([]);
+  const contactsRef = useRef<Contact[]>([]);
+  contactsRef.current = contacts;
+  const pollCodes = [...new Set([...contacts.map((c) => c.code), ...recent])].slice(0, 20).join(",");
+  useEffect(() => {
+    if (!pollCodes) return;
+    let alive = true;
+    const check = () =>
+      fetch(`${process.env.EXPO_PUBLIC_BACKEND_URL}/api/presence?codes=${pollCodes}`)
+        .then((r) => r.json())
+        .then((j) => alive && setOnline(Array.isArray(j.online) ? j.online : []))
+        .catch(() => {});
+    check();
+    const id = setInterval(check, 10000);
+    return () => {
+      alive = false;
+      clearInterval(id);
+    };
+  }, [pollCodes]);
   useEffect(() => {
     if (phase === "idle") setGuests({});
   }, [phase]);
@@ -277,7 +296,7 @@ function SenderBody() {
           }
           break;
         case "chat":
-          setMessages((a) => [...a, newMessage("them", e.text)]);
+          setMessages((a) => [...a, newMessage("them", e.text, e.from ? nameFor(contactsRef.current, e.from) ?? `Visore ${e.from}` : undefined)]);
           break;
         case "recStarted":
           setRecAt(Date.now());
@@ -361,16 +380,20 @@ function SenderBody() {
   const valid = /^\d{6}$/.test(code);
   const busy = phase !== "idle";
 
-  const call = async () => {
-    if (!valid) {
+  const call = async (target?: string) => {
+    const c = target ?? code;
+    if (!/^\d{6}$/.test(c)) {
       setStatus("Il codice deve avere 6 cifre.");
       setTone("error");
       return;
     }
-    setRecent(await addRecentCode(code));
-    pendingRef.current = { code, at: Date.now() };
-    stage.current?.send({ type: "call", code });
+    if (target) setCode(target);
+    setRecent(await addRecentCode(c));
+    pendingRef.current = { code: c, at: Date.now() };
+    stage.current?.send({ type: "call", code: c });
   };
+
+  const waiting = [...new Set([...contacts.map((c) => c.code), ...recent])].filter((c) => online.includes(c));
 
   return (
     <View style={styles.flex}>
@@ -431,7 +454,8 @@ function SenderBody() {
               stage.current?.send({ type: "addGuest", code: c });
             }}
             onRemove={(c) => stage.current?.send({ type: "removeGuest", code: c })}
-            names={contacts}
+            names={contacts.filter((c) => c.code !== pendingRef.current?.code)}
+            online={online.filter((c) => c !== pendingRef.current?.code)}
           />
         ) : null}
         {phase === "live" ? (
@@ -458,8 +482,22 @@ function SenderBody() {
             <ReactionBar onReact={react} testID="sender-reactions" />
           </View>
         ) : null}
-        {phase === "live" ? <ChatPanel messages={messages} onSend={sendChat} testID="sender-chat" /> : null}
+        {phase === "live" ? (
+          <View style={styles.chatWrap}>
+            <ChatPanel messages={messages} onSend={sendChat} testID="sender-chat" />
+          </View>
+        ) : null}
 
+        {!busy && waiting.length > 0 ? (
+          <View testID="sender-waiting">
+            <Label>In attesa ora · tocca per chiamare</Label>
+            <ChipRow testID="sender-waiting-chips">
+              {waiting.map((c) => (
+                <Chip key={c} testID={`sender-waiting-${c}`} icon="radio" label={nameFor(contacts, c) ?? c} selected={false} onPress={() => call(c)} />
+              ))}
+            </ChipRow>
+          </View>
+        ) : null}
         <Label>Codice mostrato sul visore</Label>
         <TextInput
           testID="sender-code-input"
@@ -544,7 +582,7 @@ function SenderBody() {
             onPress={() => stage.current?.send({ type: "hangup" })}
           />
         ) : (
-          <Btn testID="sender-call-button" label="Chiama" icon="phone-call" variant="primary" disabled={!valid} onPress={call} />
+          <Btn testID="sender-call-button" label="Chiama" icon="phone-call" variant="primary" disabled={!valid} onPress={() => call()} />
         )}
       </KeyboardStickyView>
     </View>
@@ -568,6 +606,7 @@ const styles = StyleSheet.create({
   },
   pillPos: { position: "absolute", top: spacing.sm, right: spacing.sm },
   statsWrap: { marginTop: spacing.sm },
+  chatWrap: { marginBottom: spacing.xl },
   liveBadge: {
     position: "absolute",
     top: spacing.sm,

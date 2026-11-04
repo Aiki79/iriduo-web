@@ -56,14 +56,12 @@ export default function Gallery() {
                 {when(item.at)} · {mb(item.size)}
               </Text>
               <View style={styles.actions}>
-                {item.kind === "photo" ? (
-                  <Action
-                    testID={`gallery-view-${item.name}`}
-                    icon="eye"
-                    label="Guarda in 3D"
-                    onPress={() => router.push({ pathname: "/viewer", params: { photo: item.name } })}
-                  />
-                ) : null}
+                <Action
+                  testID={`gallery-view-${item.name}`}
+                  icon="eye"
+                  label="Guarda in 3D"
+                  onPress={() => router.push({ pathname: "/viewer", params: item.kind === "photo" ? { photo: item.name } : { video: item.name } })}
+                />
                 <Action testID={`gallery-share-${item.name}`} icon="share-2" label="Condividi" onPress={() => shareFile(item.uri, item.kind === "photo" ? "image/jpeg" : "video/mp4")} />
                 {confirm === item.name ? (
                   <Pressable

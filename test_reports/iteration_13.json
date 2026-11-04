@@ -1,0 +1,39 @@
+{
+  "summary": "Tested the BiLume rename, the presence API, the Sala d'Attesa UI, Chat di Gruppo and regressions. Backend: 51/51 pytest passed, including 13 new presence/rename tests. Frontend: 3 isolated browser contexts with fake media (sender, viewer A, viewer B); every requested flow passed. Rename: home-title is 'BiLume', the welcome brand is 'BILUME', the WhatsApp text starts 'Ti aspetto su BiLume!', and the /api/join title is 'BiLume · codice X'. Sala d'Attesa: waiting chips appear within about 10s with contact names, or the code when the viewer is only a recent code. Tapping a chip rings the viewer immediately. The waiting section hides while live. Presence is removed while the viewer is in a call and comes back after hangup. GuestsPanel shows the green online dot for waiting viewer B (sorted first) and none for primary A; tapping it invites B. Group chat: A->B is labelled 'Visore <A>'. A->sender uses the contact name label, B->sender falls back to 'Visore <B>', and B->A is labelled. Sender->A+B arrives without a label, with no echo to the author and labelled toasts. Regressions passed: Chiama button, guest add by code, guest remove (A stays live), reaction send, hangup, fixed code persisting across reload. No deprecated Expo packages detected. No SafeAreaView issues detected. Gallery 3D video was skipped (native only).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/presence", "issue": "No rate limiting or auth. Any client can check whether any 6-digit code is online, 20 per request, so the 1M code space can be enumerated. DELETE /api/presence/{code} also lets anyone clear another viewer's presence. Low risk, but worth a simple rate limit."},
+      {"endpoint": "presence collection", "issue": "Indexes are created lazily via the _presence_index() global flag instead of in the INDEXES dict, which the repo convention asks for. Reference: /app/backend/server.py:92-100"}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "GuestsPanel suggestions", "issue": "The primary viewer currently in the call (A) is still listed as an invite suggestion chip (sender-guest-contact-<A>). Tapping it only returns a 'duplicate' message. Filter out pendingRef/primary code from the names pool too. Reference: /app/frontend/src/components/GuestsPanel.tsx:22-26, /app/frontend/app/sender.tsx:457-458", "testID": "sender-guest-contact-<code>", "priority": "LOW"}
+    ],
+    "integration_issues": [
+      {"flow": "Presence on tab close / app kill", "issue": "When the viewer web tab is closed (or the native app is killed or backgrounded), the React effect cleanup DELETE does not run. The code stays 'In attesa' on senders for up to 45s, and tapping it rings nobody. Suggest navigator.sendBeacon/fetch keepalive on pagehide (web) and an AppState 'background' -> DELETE (native). Reference: /app/frontend/app/viewer.tsx:82-93", "affected_testIDs": ["sender-waiting-<code>", "sender-guest-online-<code>"]}
+    ],
+    "design_issues": [
+      {"screen": "sender (live)", "issues": ["The sticky 'Chiudi chiamata' bar (KeyboardStickyView) sits right below the chat composer at the end of the scroll view. A tap on the composer send button while it is partly under the bar lands on hangup and ends the call. Reproduced only with a forced click at y=810 in a 390x844 viewport; a real user scrolling normally is fine. Consider extra bottom spacing after the chat panel, or moving the chat higher."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_presence.py", "/app/test_reports/pytest/pytest_results_iter13.xml", "inline browser_automation scripts (multi-context async_playwright with fake media)"],
+  "action_items": [
+    "LOW: Remove the primary viewer's code from GuestsPanel suggestions (sender.tsx passes names={contacts}; filter out pendingRef.current?.code / current primary).",
+    "LOW: Send presence DELETE on web pagehide (sendBeacon or fetch keepalive) and on native AppState background, so closed viewers don't show as waiting for 45s.",
+    "OPTIONAL: Add presence indexes to the INDEXES dict, and add a basic rate limit on /api/presence."
+  ],
+  "critical_code_review_comments": [
+    "sender.tsx is 663 lines, close to the 700-line limit. Consider extracting the presence polling and guests logic into hooks.",
+    "call(target) does not check camReady. Waiting chips are visible while the camera is still starting, so an early tap sends 'call' before the stream is ready. Not reproduced as a failure; the stage seems to handle it.",
+    "The stage.html chat relay (inoltra) correctly excludes the origin channel and tags messages with the 'from' code. The viewer validates 'from' against /^\\d{6}$/ and only accepts chat from the connected sender peer. Looks good."
+  ],
+  "updated_files": ["/app/backend/tests/test_presence.py"],
+  "success_rate": {"backend": "100% (51/51)", "frontend": "100% of requested flows (37/37 checks; one early failure was a test artifact: a forced click hit the sticky hangup bar)"},
+  "seed_data_creation": "None persisted. Presence tests use random codes and delete them in teardown. UI contacts were created only in throwaway browser contexts.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Use async_playwright inside browser_automation with --use-fake-device-for-media-stream and --use-fake-ui-for-media-stream, one new_context per role, and an init script setting localStorage onboarded=true. Chat testIDs: <prefix>-chat-composer-input, <prefix>-chat-composer-send-button, <prefix>-chat-msg-them/me (prefix: sender/viewer). Before clicking the sender's chat send button or reactions, scrollIntoView({block:'center'}), otherwise a forced click lands on the sticky hangup bar. Sender presence polling is every 10s, so allow up to 15s for waiting chips or online dots."
+}

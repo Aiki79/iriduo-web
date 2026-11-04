@@ -9,7 +9,7 @@ import { colors, fonts, radius, spacing } from "@/src/theme";
 const STATE_LABEL: Record<string, string> = { adding: "Chiamo…", ringing: "Squilla…", connected: "Sta guardando" };
 
 /** Invite up to 3 more viewers to watch the same live broadcast. */
-export function GuestsPanel({ guests, onAdd, onRemove, names }: { guests: Record<string, string>; onAdd: (code: string) => void; onRemove: (code: string) => void; names: Contact[] }) {
+export function GuestsPanel({ guests, onAdd, onRemove, names, online = [] }: { guests: Record<string, string>; onAdd: (code: string) => void; onRemove: (code: string) => void; names: Contact[]; online?: string[] }) {
   const [code, setCode] = useState("");
   const list = Object.entries(guests);
   const full = list.length >= 3;
@@ -19,7 +19,11 @@ export function GuestsPanel({ guests, onAdd, onRemove, names }: { guests: Record
     onAdd(code);
     setCode("");
   };
-  const suggestions = names.filter((c) => !guests[c.code]).slice(0, 6);
+  const pool: Contact[] = [...names, ...online.filter((c) => !nameFor(names, c)).map((c) => ({ code: c, name: c }))];
+  const suggestions = pool
+    .filter((c) => !guests[c.code])
+    .sort((a, b) => Number(online.includes(b.code)) - Number(online.includes(a.code)))
+    .slice(0, 6);
 
   return (
     <View style={styles.panel} testID="sender-guests">
@@ -29,7 +33,9 @@ export function GuestsPanel({ guests, onAdd, onRemove, names }: { guests: Record
         <View key={c} style={styles.row} testID={`sender-guest-${c}`}>
           <View style={[styles.dot, { backgroundColor: s === "connected" ? colors.success : colors.warning }]} />
           <View style={styles.flex}>
-            <Text style={styles.name}>{nameFor(names, c) ?? c}</Text>
+            <Text style={styles.name} numberOfLines={1}>
+              {nameFor(names, c) ?? c}
+            </Text>
             <Text style={styles.state} testID={`sender-guest-state-${c}`}>
               {STATE_LABEL[s] ?? s}
             </Text>
@@ -45,8 +51,11 @@ export function GuestsPanel({ guests, onAdd, onRemove, names }: { guests: Record
             <View style={styles.sugg}>
               {suggestions.map((c) => (
                 <Pressable key={c.code} testID={`sender-guest-contact-${c.code}`} onPress={() => onAdd(c.code)} style={({ pressed }) => [styles.chip, pressed && styles.pressed]}>
+                  {online.includes(c.code) ? <View style={[styles.dot, { backgroundColor: colors.success }]} testID={`sender-guest-online-${c.code}`} /> : null}
                   <Feather name="user-plus" size={14} color={colors.brandPrimary} />
-                  <Text style={styles.chipText}>{c.name}</Text>
+                  <Text style={styles.chipText} numberOfLines={1}>
+                    {c.name}
+                  </Text>
                 </Pressable>
               ))}
             </View>
@@ -75,7 +84,7 @@ export function GuestsPanel({ guests, onAdd, onRemove, names }: { guests: Record
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1 },
+  flex: { flex: 1, minWidth: 0 },
   panel: { backgroundColor: colors.surfaceSecondary, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: spacing.md, paddingBottom: spacing.md, marginTop: spacing.sm, gap: spacing.sm },
   hint: { fontFamily: fonts.regular, fontSize: 14, color: colors.muted, lineHeight: 20 },
   row: { flexDirection: "row", alignItems: "center", gap: spacing.md, backgroundColor: colors.surfaceTertiary, borderRadius: radius.md, padding: spacing.sm },
@@ -84,10 +93,10 @@ const styles = StyleSheet.create({
   state: { fontFamily: fonts.regular, fontSize: 13, color: colors.muted },
   remove: { width: 44, height: 44, borderRadius: radius.md, backgroundColor: colors.error, alignItems: "center", justifyContent: "center" },
   sugg: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
-  chip: { flexDirection: "row", alignItems: "center", gap: spacing.xs, height: 44, paddingHorizontal: spacing.md, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceTertiary },
-  chipText: { fontFamily: fonts.bold, fontSize: 14, color: colors.onSurface },
+  chip: { flexDirection: "row", alignItems: "center", gap: spacing.xs, height: 44, maxWidth: "100%", paddingHorizontal: spacing.md, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceTertiary },
+  chipText: { flexShrink: 1, fontFamily: fonts.bold, fontSize: 14, color: colors.onSurface },
   inputRow: { flexDirection: "row", gap: spacing.sm },
-  input: { flex: 1, minHeight: 48, backgroundColor: colors.surfaceTertiary, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: spacing.md, fontFamily: fonts.bold, fontSize: 17, letterSpacing: 2, color: colors.onSurface },
+  input: { flex: 1, minWidth: 0, minHeight: 48, backgroundColor: colors.surfaceTertiary, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: spacing.md, fontFamily: fonts.bold, fontSize: 17, letterSpacing: 2, color: colors.onSurface },
   add: { width: 48, height: 48, borderRadius: radius.md, backgroundColor: colors.brandPrimary, alignItems: "center", justifyContent: "center" },
   disabled: { opacity: 0.45 },
   pressed: { opacity: 0.8, transform: [{ scale: 0.96 }] },

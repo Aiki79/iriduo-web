@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <meta name="color-scheme" content="dark">
-<title>Scena VR180</title>
+<title>BiLume</title>
 <style>
   html,body{margin:0;height:100%;background:#000;overflow:hidden;color:#EAF0F7;
     font-family:system-ui,sans-serif;-webkit-user-select:none;user-select:none}
@@ -339,7 +339,7 @@ function avviaPeerVisore(){
     });
     dc.on('data', d => {
       if (d && d.t === 'cancel' && canali[dc.peer] === dc) annullata(dc.peer);
-      if (d && d.t === 'chat' && chiamataV && chiamataV.peer === dc.peer) send({ type:'chat', text: String(d.text || '').slice(0, 300) });
+      if (d && d.t === 'chat' && chiamataV && chiamataV.peer === dc.peer) send({ type:'chat', text: String(d.text || '').slice(0, 300), from: /^\d{6}$/.test(String(d.from || '')) ? String(d.from) : undefined });
       if (d && d.t === 'react' && chiamataV && chiamataV.peer === dc.peer) reazioneRicevuta(String(d.kind));
     });
     dc.on('close', () => { if (canali[dc.peer] !== dc) return; delete canali[dc.peer]; annullata(dc.peer); });
@@ -543,7 +543,7 @@ handlers.call = async c => {
   canaleS = peerS.connect(PREFISSO + codice);
   canaleS.on('data', d => {
     if (d && d.t === 'decline') { stato('Chiamata rifiutata dal visore.'); fineS(); }
-    if (d && d.t === 'chat' && chiamataS) send({ type:'chat', text: String(d.text || '').slice(0, 300) });
+    if (d && d.t === 'chat' && chiamataS) { const text = String(d.text || '').slice(0, 300); send({ type:'chat', text, from: codicePrimario }); inoltra(canaleS, text, codicePrimario); }
     if (d && d.t === 'react' && chiamataS) reazioneRicevuta(String(d.kind));
   });
   chiamataS = peerS.call(PREFISSO + codice, streamLocale);
@@ -592,7 +592,7 @@ handlers.addGuest = c => {
   dc.on('data', d => {
     if (!d || (ospiti[code] !== o && chiamataS !== o.call)) return;
     if (d.t === 'decline') togliOspite(code, 'declined');
-    if (d.t === 'chat') send({ type:'chat', text: String(d.text || '').slice(0, 300) });
+    if (d.t === 'chat') { const text = String(d.text || '').slice(0, 300); send({ type:'chat', text, from: code }); inoltra(o.dc, text, code); }
     if (d.t === 'react') reazioneRicevuta(String(d.kind));
   });
   o.timer = setTimeout(() => { if (ospiti[code] === o && o.state === 'ringing') togliOspite(code, 'noanswer'); }, 45000);
@@ -605,6 +605,25 @@ handlers.addGuest = c => {
   call.on('close', () => { if (ospiti[code] === o) togliOspite(code, 'ended'); });
 };
 handlers.removeGuest = c => togliOspite(String(c.code || ''), 'removed');
+function inoltra(da, text, code){
+  // chat di gruppo: chi trasmette inoltra il messaggio di un visore a tutti gli altri
+  for (const dc of canaliUscita()) if (dc !== da) { try { dc.send({ t:'chat', text, from: code }); } catch {} }
+}
+let vidParti = [];
+handlers.vidChunk = c => {
+  if (MODE !== 'viewer' || chiamataV) return;
+  if (c.i === 0) { vidParti = []; hint('Carico la registrazione…'); }
+  const bin = atob(String(c.data || '')); const u = new Uint8Array(bin.length);
+  for (let k = 0; k < bin.length; k++) u[k] = bin.charCodeAt(k);
+  vidParti.push(u);
+  if (c.i !== c.n - 1) return;
+  const blob = new Blob(vidParti, { type: String(c.mime || 'video/mp4') }); vidParti = [];
+  fermaDemo(); video.srcObject = null;
+  video.src = URL.createObjectURL(blob); video.loop = true; video.muted = false;
+  video.play().then(() => stato('Registrazione in riproduzione. Guardati intorno.'))
+             .catch(() => { hint('Tocca la scena per avviare il video'); stato('Registrazione pronta: tocca la scena per avviarla.'); });
+  send({ type:'test', name:'video' });
+};
 function canaliUscita(){
   const out = [];
   if (MODE === 'sender') { if (chiamataS && canaleS) out.push(canaleS); for (const o of Object.values(ospiti)) if (o.dc) out.push(o.dc); }
