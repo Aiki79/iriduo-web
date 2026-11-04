@@ -2,7 +2,7 @@ import { createElement, useEffect, useImperativeHandle, useRef, useState, type R
 import { StyleSheet, View } from "react-native";
 
 import { colors } from "@/src/theme";
-import { stageUrl, type StageCmd, type StageEvent, type StageHandle } from "./stage-types";
+import { stageOrigin, stageUrl, type StageCmd, type StageEvent, type StageHandle } from "./stage-types";
 
 type Props = {
   mode: "viewer" | "sender";
@@ -19,7 +19,7 @@ export function StageView({ mode, onEvent, ref, testID }: Props) {
 
   useEffect(() => {
     const listener = (e: MessageEvent) => {
-      if (!frame.current || e.source !== frame.current.contentWindow) return;
+      if (!frame.current || e.source !== frame.current.contentWindow || e.origin !== stageOrigin()) return;
       try {
         const data = typeof e.data === "string" ? JSON.parse(e.data) : e.data;
         if (data && data.type) handler.current(data);
@@ -32,7 +32,7 @@ export function StageView({ mode, onEvent, ref, testID }: Props) {
   }, []);
 
   useImperativeHandle(ref, () => ({
-    send: (c: StageCmd) => frame.current?.contentWindow?.postMessage(JSON.stringify({ ...c, __cmd: true }), "*"),
+    send: (c: StageCmd) => frame.current?.contentWindow?.postMessage(JSON.stringify({ ...c, __cmd: true }), stageOrigin()),
     reload: () => setKey((k) => k + 1),
   }));
 

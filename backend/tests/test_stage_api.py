@@ -35,7 +35,10 @@ class TestStage:
         r = s.get(f"{BASE_URL}/api/stage")
         assert r.status_code == 200
 
-    def test_cdn_scripts_reachable(self, s):
-        for u in ["https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js",
-                  "https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"]:
-            assert s.get(u, timeout=20).status_code == 200
+    # libs are now self-hosted (security fix iteration 9)
+    def test_self_hosted_libs(self, s):
+        for n in ["three.min.js", "peerjs.min.js"]:
+            r = s.get(f"{BASE_URL}/api/lib/{n}", timeout=20)
+            assert r.status_code == 200
+            assert "javascript" in r.headers["content-type"]
+            assert len(r.content) > 50000

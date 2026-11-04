@@ -10,11 +10,13 @@ import { StageView } from "@/src/components/StageView";
 import { ChatPanel, ChatToasts, newMessage, type ChatMessage } from "@/src/components/CallChat";
 import { FloatingReactions, newReaction, ReactionBar, type FloatingReaction } from "@/src/components/Reactions";
 import * as Haptics from "expo-haptics";
-import { CallPill, CallStatsCard, quality, type CallStatsData } from "@/src/components/CallStats";
+import { CallPill, CallStatsCard, formatDuration, quality, type CallStatsData } from "@/src/components/CallStats";
 import { addCall, topQuality, type CallResult } from "@/src/history";
 import type { Device, StageEvent, StageHandle } from "@/src/components/stage-types";
 import { Btn, Chip, ChipRow, Header, Label, StatusBox, Toggle } from "@/src/components/ui";
 import { addRecentCode, getRecentCodes } from "@/src/recent";
+import { getContacts, nameFor, type Contact } from "@/src/contacts";
+import { ChunkReceiver } from "@/src/media";
 import { colors, fonts, radius, spacing } from "@/src/theme";
 
 const isWeb = Platform.OS === "web";
@@ -117,6 +119,16 @@ function SenderBody() {
   const weakRef = useRef(0);
   const goodRef = useRef(0);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [recAt, setRecAt] = useState<number | null>(null);
+  const [recNow, setRecNow] = useState(Date.now());
+  const [mediaMsg, setMediaMsg] = useState<{ text: string; tone: "info" | "success" | "error" } | null>(null);
+  const receiver = useRef(new ChunkReceiver());
+  useEffect(() => {
+    if (!recAt) return;
+    const id = setInterval(() => setRecNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [recAt]);
   const sendChat = useCallback((text: string) => {
     const m = newMessage("me", text);
     setMessages((a) => [...a, m]);
@@ -140,6 +152,7 @@ function SenderBody() {
 
   useEffect(() => {
     getRecentCodes().then(setRecent);
+    getContacts().then(setContacts);
   }, []);
 
   const { code: linkCode } = useLocalSearchParams<{ code?: string }>();
@@ -249,6 +262,28 @@ function SenderBody() {
         case "chat":
           setMessages((a) => [...a, newMessage("them", e.text)]);
           break;
+        case "recStarted":
+          setRecAt(Date.now());
+          setRecNow(Date.now());
+          setMediaMsg({ text: "Registrazione in corso (massimo 5 minuti).", tone: "info" });
+          break;
+        case "recError":
+          setRecAt(null);
+          setMediaMsg({ text: e.text, tone: "error" });
+          break;
+        case "recSaved":
+          setRecAt(null);
+          setMediaMsg({ text: `Registrazione salvata: ${e.name}`, tone: "success" });
+          break;
+        case "recChunk":
+          if (e.i === 0) {
+            setRecAt(null);
+            setMediaMsg({ text: "Preparo il video registrato…", tone: "info" });
+          }
+          receiver.current.push(e.i, e.n, e.name, e.data, e.mime, (ok) =>
+            setMediaMsg(ok ? { text: `Registrazione pronta: ${e.name}`, tone: "success" } : { text: "Non sono riuscito a salvare la registrazione.", tone: "error" }),
+          );
+          break;
         case "react":
           addFloater(e.kind);
           if (Platform.OS !== "web" && Date.now() - lastBuzzRef.current > 600) {
@@ -350,6 +385,24 @@ function SenderBody() {
         ) : null}
         {phase === "live" ? (
           <View style={styles.statsWrap}>
+            <Label>Registrazione</Label>
+            <Btn
+              compact
+              testID="sender-record-button"
+              label={recAt ? `Ferma ${formatDuration(recNow - recAt)}` : "Registra la tua trasmissione"}
+              icon={recAt ? "stop-circle" : "circle"}
+              variant={recAt ? "danger" : "secondary"}
+              onPress={() => stage.current?.send({ type: recAt ? "recStop" : "recStart" })}
+            />
+          </View>
+        ) : null}
+        {mediaMsg ? (
+          <View style={styles.statsWrap}>
+            <StatusBox testID="sender-media-status" text={mediaMsg.text} tone={mediaMsg.tone} />
+          </View>
+        ) : null}
+        {phase === "live" ? (
+          <View style={styles.statsWrap}>
             <Label>Reazioni</Label>
             <ReactionBar onReact={react} testID="sender-reactions" />
           </View>
@@ -369,11 +422,20 @@ function SenderBody() {
           returnKeyType="done"
           style={[styles.input, valid && styles.inputValid]}
         />
-        {recent.length > 0 && (
-          <ChipRow testID="sender-recent-codes">
-            {recent.map((c) => (
-              <Chip key={c} testID={`sender-recent-code-${c}`} icon="clock" label={c} selected={code === c} onPress={() => !busy && setCode(c)} />
+        {contacts.length > 0 && (
+          <ChipRow testID="sender-contact-chips">
+            {contacts.map((c) => (
+              <Chip key={c.code} testID={`sender-contact-${c.code}`} icon="user" label={c.name} selected={code === c.code} onPress={() => !busy && setCode(c.code)} />
             ))}
+          </ChipRow>
+        )}
+        {recent.filter((c) => !nameFor(contacts, c)).length > 0 && (
+          <ChipRow testID="sender-recent-codes">
+            {recent
+              .filter((c) => !nameFor(contacts, c))
+              .map((c) => (
+                <Chip key={c} testID={`sender-recent-code-${c}`} icon="clock" label={c} selected={code === c} onPress={() => !busy && setCode(c)} />
+              ))}
           </ChipRow>
         )}
 

@@ -13,7 +13,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StageView } from "@/src/components/StageView";
 import { ChatComposer, ChatPanel, ChatToasts, newMessage, type ChatMessage } from "@/src/components/CallChat";
 import { ReactionBar } from "@/src/components/Reactions";
-import { CallPill, CallStatsCard, quality, type CallStatsData } from "@/src/components/CallStats";
+import { ChunkReceiver, saveAndShare } from "@/src/media";
+import { CallPill, CallStatsCard, formatDuration, quality, type CallStatsData } from "@/src/components/CallStats";
 import { addCall, topQuality } from "@/src/history";
 import { ShareCode } from "@/src/components/ShareCode";
 import type { StageEvent, StageHandle } from "@/src/components/stage-types";
@@ -61,6 +62,15 @@ export default function Viewer() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [composerOpen, setComposerOpen] = useState(false);
   const lastBuzzRef = useRef(0);
+  const [recAt, setRecAt] = useState<number | null>(null);
+  const [recNow, setRecNow] = useState(Date.now());
+  const [mediaMsg, setMediaMsg] = useState<{ text: string; tone: "info" | "success" | "error" } | null>(null);
+  const receiver = useRef(new ChunkReceiver());
+  useEffect(() => {
+    if (!recAt) return;
+    const id = setInterval(() => setRecNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [recAt]);
   const codeRef = useRef<string>("");
   const callRef = useRef<{ at: number; counts: Record<string, number> } | null>(null);
   const incomingRef = useRef(false);
@@ -116,12 +126,41 @@ export default function Viewer() {
           if (!callRef.current) {
             callRef.current = { at: Date.now(), counts: {} };
             setMessages([]);
+            setMediaMsg(null);
           }
           incomingRef.current = false;
           break;
         case "chat":
           setMessages((a) => [...a, newMessage("them", e.text)]);
           if (!isWeb) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          break;
+        case "snapshot":
+          if (!isWeb) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          setMediaMsg({ text: `Foto 3D pronta: ${e.name}`, tone: "success" });
+          if (e.data) saveAndShare(e.name, e.data, "image/jpeg").catch(() => setMediaMsg({ text: "Non sono riuscito a salvare la foto.", tone: "error" }));
+          break;
+        case "snapError":
+        case "recError":
+          setMediaMsg({ text: e.text, tone: "error" });
+          setRecAt(null);
+          break;
+        case "recStarted":
+          setRecAt(Date.now());
+          setRecNow(Date.now());
+          setMediaMsg({ text: "Registrazione in corso (massimo 5 minuti).", tone: "info" });
+          break;
+        case "recSaved":
+          setRecAt(null);
+          setMediaMsg({ text: `Registrazione salvata: ${e.name}`, tone: "success" });
+          break;
+        case "recChunk":
+          if (e.i === 0) {
+            setRecAt(null);
+            setMediaMsg({ text: "Preparo il video registrato…", tone: "info" });
+          }
+          receiver.current.push(e.i, e.n, e.name, e.data, e.mime, (ok) =>
+            setMediaMsg(ok ? { text: `Registrazione pronta: ${e.name}`, tone: "success" } : { text: "Non sono riuscito a salvare la registrazione.", tone: "error" }),
+          );
           break;
         case "react":
           if (!isWeb && Date.now() - lastBuzzRef.current > 600) {
@@ -226,7 +265,16 @@ export default function Viewer() {
   return (
     <View style={styles.root} testID="viewer-screen">
       <StatusBar hidden={full} style="light" />
-      {!full && <Header title="Visore" />}
+      {!full && (
+        <Header
+          title="Visore"
+          right={
+            phase === "waiting" || phase === "error" ? (
+              <IconBtn icon="refresh-cw" label="Nuovo codice" testID="viewer-new-code-button" onPress={() => send({ type: "newCode" })} />
+            ) : null
+          }
+        />
+      )}
 
       {!full && (
         <View style={styles.top}>
@@ -282,6 +330,17 @@ export default function Viewer() {
             <View style={styles.row}>
               {motion && <IconBtn icon="crosshair" label="Ricentra" testID="viewer-recenter-fullscreen-button" onPress={() => send({ type: "recenter" })} />}
               {phase === "connected" && (
+                <IconBtn icon="camera" label="Foto 3D" testID="viewer-snapshot-fullscreen-button" onPress={() => send({ type: "snapshot" })} />
+              )}
+              {phase === "connected" && (
+                <IconBtn
+                  icon={recAt ? "stop-circle" : "circle"}
+                  label={recAt ? "Ferma registrazione" : "Registra"}
+                  testID="viewer-record-fullscreen-button"
+                  onPress={() => send({ type: recAt ? "recStop" : "recStart" })}
+                />
+              )}
+              {phase === "connected" && (
                 <IconBtn
                   icon={composerOpen ? "x" : "message-circle"}
                   label={composerOpen ? "Chiudi messaggi" : "Messaggi"}
@@ -330,6 +389,30 @@ export default function Viewer() {
           {startedAt && phase === "connected" ? (
             <View style={styles.mt}>
               <CallStatsCard startedAt={startedAt} stats={stats} direction="in" testID="viewer-call-stats" />
+            </View>
+          ) : null}
+          {phase === "connected" || (testing && DEMOS.some((d) => d.id === testing)) ? (
+            <View style={styles.mt}>
+              <Label>Ricordi 3D</Label>
+              <View style={styles.row}>
+                <Btn compact testID="viewer-snapshot-button" label="Foto 3D" icon="camera" onPress={() => send({ type: "snapshot" })} style={styles.flex} />
+                {phase === "connected" ? (
+                  <Btn
+                    compact
+                    testID="viewer-record-button"
+                    label={recAt ? `Ferma ${formatDuration(recNow - recAt)}` : "Registra"}
+                    icon={recAt ? "stop-circle" : "circle"}
+                    variant={recAt ? "danger" : "secondary"}
+                    onPress={() => send({ type: recAt ? "recStop" : "recStart" })}
+                    style={styles.flex}
+                  />
+                ) : null}
+              </View>
+            </View>
+          ) : null}
+          {mediaMsg ? (
+            <View style={styles.mt}>
+              <StatusBox testID="viewer-media-status" text={mediaMsg.text} tone={mediaMsg.tone} />
             </View>
           ) : null}
           {phase === "connected" ? (

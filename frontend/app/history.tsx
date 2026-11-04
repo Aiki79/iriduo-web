@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { formatDuration } from "@/src/components/CallStats";
 import { Btn, Header, IconBtn } from "@/src/components/ui";
 import { clearHistory, getHistory, RESULT_LABEL, type CallRecord } from "@/src/history";
+import { getContacts, nameFor, type Contact } from "@/src/contacts";
 import { colors, fonts, radius, spacing } from "@/src/theme";
 
 const QUALITY_COLOR: Record<string, string> = { Buona: colors.success, Media: colors.warning, Debole: colors.error };
@@ -16,7 +17,7 @@ function when(at: number) {
   return new Date(at).toLocaleString("it-IT", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 }
 
-function Row({ item, index }: { item: CallRecord; index: number }) {
+function Row({ item, index, name }: { item: CallRecord; index: number; name?: string }) {
   const router = useRouter();
   const ok = item.result === "completata";
   const out = item.role === "out";
@@ -26,7 +27,23 @@ function Row({ item, index }: { item: CallRecord; index: number }) {
         <Feather name={out ? "arrow-up-right" : "arrow-down-left"} size={20} color={ok ? colors.brandPrimary : colors.error} />
       </View>
       <View style={styles.flex}>
-        <Text style={styles.code}>{item.code}</Text>
+        <View style={styles.nameRow}>
+          <Text style={styles.code} numberOfLines={1}>
+            {name ?? item.code}
+          </Text>
+          {out && !name ? (
+            <Pressable
+              testID={`history-save-contact-${item.id}`}
+              accessibilityLabel="Salva in rubrica"
+              hitSlop={8}
+              style={styles.saveBtn}
+              onPress={() => router.push({ pathname: "/contacts", params: { code: item.code } })}
+            >
+              <Feather name="user-plus" size={18} color={colors.brandPrimary} />
+            </Pressable>
+          ) : null}
+        </View>
+        {name ? <Text style={styles.meta}>{item.code}</Text> : null}
         <Text style={styles.meta} numberOfLines={2}>
           {out ? "Trasmessa" : "Ricevuta"} · {when(item.at)}
         </Text>
@@ -62,10 +79,12 @@ export default function History() {
   const router = useRouter();
   const [items, setItems] = useState<CallRecord[] | null>(null);
   const [confirm, setConfirm] = useState(false);
+  const [contacts, setContacts] = useState<Contact[]>([]);
 
   useFocusEffect(
     useCallback(() => {
       getHistory().then(setItems);
+      getContacts().then(setContacts);
     }, []),
   );
 
@@ -101,7 +120,7 @@ export default function History() {
         testID="history-list"
         data={items ?? []}
         keyExtractor={(i) => i.id}
-        renderItem={({ item, index }) => <Row item={item} index={index} />}
+        renderItem={({ item, index }) => <Row item={item} index={index} name={nameFor(contacts, item.code)} />}
         contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + spacing.xl }]}
         ListHeaderComponent={
           items && items.length > 0 ? (
@@ -141,7 +160,9 @@ const styles = StyleSheet.create({
     padding: spacing.md,
   },
   icon: { width: 44, height: 44, borderRadius: radius.md, alignItems: "center", justifyContent: "center" },
-  code: { fontFamily: fonts.bold, fontSize: 20, letterSpacing: 3, color: colors.onSurface },
+  code: { flexShrink: 1, fontFamily: fonts.bold, fontSize: 20, letterSpacing: 1, color: colors.onSurface },
+  nameRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
+  saveBtn: { width: 44, height: 44, alignItems: "center", justifyContent: "center", marginVertical: -spacing.md },
   meta: { fontFamily: fonts.regular, fontSize: 13, color: colors.muted },
   tags: { flexDirection: "row", alignItems: "center", gap: spacing.sm, marginTop: 2 },
   result: { fontFamily: fonts.bold, fontSize: 14 },

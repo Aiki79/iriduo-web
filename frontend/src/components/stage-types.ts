@@ -19,8 +19,15 @@ export type StageEvent =
   | { type: "chat"; text: string }
   | { type: "react"; kind: string }
   | { type: "chatSent"; id: string }
-  | { type: "chatError"; id: string };
+  | { type: "chatError"; id: string }
+  | { type: "snapshot"; name: string; data?: string; web?: boolean }
+  | { type: "snapError"; text: string }
+  | { type: "recStarted" }
+  | { type: "recError"; text: string }
+  | { type: "recSaved"; name: string; web?: boolean }
+  | { type: "recChunk"; i: number; n: number; data: string; name: string; mime: string };
 
 export type StageHandle = { send: (c: StageCmd) => void; reload: () => void };
 
 export const stageUrl = (mode: string) => `${process.env.EXPO_PUBLIC_BACKEND_URL}/api/stage?mode=${mode}`;
+export const stageOrigin = () => new URL(String(process.env.EXPO_PUBLIC_BACKEND_URL)).origin;

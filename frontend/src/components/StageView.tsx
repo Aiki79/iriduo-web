@@ -3,7 +3,7 @@ import { StyleSheet, View } from "react-native";
 import { WebView } from "react-native-webview";
 
 import { colors } from "@/src/theme";
-import { stageUrl, type StageCmd, type StageEvent, type StageHandle } from "./stage-types";
+import { stageOrigin, stageUrl, type StageCmd, type StageEvent, type StageHandle } from "./stage-types";
 
 type Props = {
   mode: "viewer" | "sender";
@@ -27,12 +27,13 @@ export function StageView({ mode, onEvent, ref, testID }: Props) {
       <WebView
         ref={wv}
         source={{ uri: stageUrl(mode) }}
-        originWhitelist={["*"]}
+        originWhitelist={[stageOrigin()]}
+        onShouldStartLoadWithRequest={(r) => r.url.startsWith(`${stageOrigin()}/`) || r.url.startsWith("blob:") || r.url === "about:blank"}
         javaScriptEnabled
         allowsInlineMediaPlayback
         mediaPlaybackRequiresUserAction={false}
-        mediaCapturePermissionGrantType="grant"
-        allowFileAccess
+        mediaCapturePermissionGrantType="grantIfSameHostElsePrompt"
+        allowFileAccess={false}
         bounces={false}
         scrollEnabled={false}
         style={styles.web}

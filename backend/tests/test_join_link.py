@@ -23,16 +23,16 @@ def s():
 # Deep link landing page /api/join
 class TestJoin:
     def test_exp_scheme(self, s):
-        r = s.get(f"{BASE_URL}/api/join", params={"code": "123456", "app": "exp://host/--/"})
+        r = s.get(f"{BASE_URL}/api/join", params={"code": "123456", "app": "exp://abc.preview.emergentagent.com/--/"})
         assert r.status_code == 200
         assert "text/html" in r.headers["content-type"]
         assert 'id="code">123456<' in r.text
         assert "codice 123456" in r.text
-        assert open_href(r.text) == "exp://host/--/sender?code=123456"
+        assert open_href(r.text) == "exp://abc.preview.emergentagent.com/--/sender?code=123456"
 
     def test_exp_no_trailing_slash(self, s):
-        r = s.get(f"{BASE_URL}/api/join", params={"code": "123456", "app": "exp://host/--"})
-        assert open_href(r.text) == "exp://host/--/sender?code=123456"
+        r = s.get(f"{BASE_URL}/api/join", params={"code": "123456", "app": "exp://abc.preview.emergentagent.com/--"})
+        assert open_href(r.text) == "exp://abc.preview.emergentagent.com/--/sender?code=123456"
 
     def test_default_app(self, s):
         r = s.get(f"{BASE_URL}/api/join", params={"code": "111222"})
@@ -46,14 +46,14 @@ class TestJoin:
         assert open_href(r.text) == "frontend://sender?code=123456"
 
     def test_xss_escaped(self, s):
-        r = s.get(f"{BASE_URL}/api/join", params={"code": "123456", "app": 'exp://x/"><script>alert(1)</script>'})
+        r = s.get(f"{BASE_URL}/api/join", params={"code": "123456", "app": 'exp://a.preview.emergentagent.com/"><script>alert(1)</script>'})
         assert r.status_code == 200
         assert "<script>alert(1)" not in r.text
         assert "&quot;&gt;&lt;script&gt;" in r.text
 
     @pytest.mark.parametrize("code", ["12345", "1234567", "abcdef", "12345a", ""])
     def test_bad_code_422(self, s, code):
-        r = s.get(f"{BASE_URL}/api/join", params={"code": code, "app": "exp://host/--/"})
+        r = s.get(f"{BASE_URL}/api/join", params={"code": code, "app": "exp://abc.preview.emergentagent.com/--/"})
         assert r.status_code == 422
 
     def test_missing_code_422(self, s):

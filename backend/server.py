@@ -1,6 +1,6 @@
 import asyncio
 from contextlib import suppress
-from fastapi import FastAPI, APIRouter, Query, Request
+from fastapi import FastAPI, APIRouter, HTTPException, Query, Request
 from fastapi.responses import FileResponse, HTMLResponse
 import html
 from dotenv import load_dotenv
@@ -86,11 +86,38 @@ STAGE_HTML = ROOT_DIR / "stage.html"
 @api_router.get("/stage", include_in_schema=False)
 async def stage():
     """3D stage (WebRTC + three.js) embedded by the mobile app."""
-    return FileResponse(STAGE_HTML, media_type="text/html", headers={"Cache-Control": "no-cache"})
+    return FileResponse(STAGE_HTML, media_type="text/html", headers={"Cache-Control": "no-cache", "Content-Security-Policy": STAGE_CSP})
+
+
+STAGE_CSP = (
+    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; "
+    "connect-src 'self' https://0.peerjs.com wss://0.peerjs.com; img-src 'self' data: blob:; "
+    "media-src 'self' blob: mediastream:; frame-ancestors 'self'; base-uri 'none'; form-action 'none'"
+)
+LIB_DIR = ROOT_DIR / "lib"
+LIBS = {"three.min.js", "peerjs.min.js"}
+
+
+@api_router.get("/lib/{name}", include_in_schema=False)
+async def stage_lib(name: str):
+    """Self-hosted copies of three.js 0.158.0 and PeerJS 1.5.4 (no third-party CDN at runtime)."""
+    if name not in LIBS:
+        raise HTTPException(status_code=404)
+    return FileResponse(LIB_DIR / name, media_type="application/javascript", headers={"Cache-Control": "public, max-age=86400"})
 
 
 JOIN_HTML = (ROOT_DIR / "join.html").read_text(encoding="utf-8")
-APP_SCHEMES = ("frontend://", "exp://", "exps://")
+EXPO_GO_HOST_SUFFIXES = (".emergentagent.com", ".emergent.host", ".emergent.sh")
+
+
+def _allowed_app_base(base: str) -> bool:
+    """Only this app's own scheme, or Expo Go links that point at Emergent preview hosts."""
+    if base.startswith("frontend://"):
+        return True
+    if base.startswith(("exp://", "exps://")):
+        host = base.split("://", 1)[1].split("/", 1)[0].split(":", 1)[0].lower()
+        return host.endswith(EXPO_GO_HOST_SUFFIXES)
+    return False
 
 
 @api_router.get("/join", include_in_schema=False)
@@ -99,7 +126,7 @@ async def join(request: Request, code: str = Query(..., pattern=r"^\d{6}$"), app
     host = (request.headers.get("x-forwarded-host") or request.headers.get("host") or "").split(",")[0].strip()
     own_web = f"https://{host}"  # web preview: same host as the API
     same_host = bool(host) and (app_base == own_web or app_base.startswith(own_web + "/"))
-    base = app_base if app_base.startswith(APP_SCHEMES) or same_host else "frontend://"
+    base = app_base if same_host or _allowed_app_base(app_base) else "frontend://"
     if not base.endswith("/"):
         base += "/"
     app_url = html.escape(f"{base}sender?code={code}", quote=True)
@@ -112,7 +139,7 @@ app.include_router(api_router)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_credentials=True,
+    allow_credentials=False,
     allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],

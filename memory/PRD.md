@@ -14,6 +14,11 @@
 - Native: expo-sensors DeviceMotion for looking around, expo-screen-orientation for landscape fullscreen, expo-camera permissions, recent codes stored locally
 
 ## Implemented (2026-06)
+- Security: three.js/PeerJS served from /api/lib, CSP + frame-ancestors on the stage, postMessage limited to the app's own origin, codes from crypto.getRandomValues, more than 5 calls a minute -> new code, "Nuovo codice" button, /api/join allowlist (frontend:// or exp:// on Emergent hosts), CORS without credentials, WebView limited to its own origin with no file access
+- Contacts (/contacts): name + code, delete with confirmation, call; names in the sender and the history
+- 3D photo (SBS/TB JPEG of the video or demo) and recording (MediaRecorder, max 5 min, auto-save on hangup); native: base64 chunks -> expo-file-system -> share sheet; web: download
+- Onboarding /welcome (3 steps, shown only on first launch, "Come funziona" in Home)
+- Pro subscription (RevenueCat): POSTPONED by the user
 - Quick reactions (heart, applause, star, like, wow): sprites in the viewer's 3D scene (per-eye disparity, offset scaled to the field of view, frame-rate independent) and floaters on the sender's preview; 200ms rate limit on both sides
 - Chat during calls over the PeerJS data connection: quick replies + text, chat panel (viewer and sender), toasts over the video (doubled in split view), message box in fullscreen
 - Call history (/history, local storage): incoming/outgoing, duration, average quality, result, Richiama (auto-call), clear

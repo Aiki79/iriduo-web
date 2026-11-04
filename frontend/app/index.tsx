@@ -2,12 +2,16 @@ import { Feather } from "@react-native-vector-icons/feather";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
+import { useEffect } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { IconName } from "@/src/components/ui";
 import { colors, fonts, radius, spacing } from "@/src/theme";
+import { storage } from "@/src/utils/storage";
+
+const ONBOARDED_KEY = "onboarded"; // same key written by app/welcome.tsx
 
 const HERO =
   "https://images.unsplash.com/photo-1535540878298-a155c6d065ef?crop=entropy&cs=srgb&fm=jpg&ixlib=rb-4.1.0&q=85&w=1200";
@@ -32,6 +36,11 @@ function RoleCard({ title, text, icon, onPress, testID, delay }: { title: string
 export default function Home() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  useEffect(() => {
+    storage.getItem(ONBOARDED_KEY, false).then((v) => {
+      if (!v) router.replace("/welcome");
+    });
+  }, [router]);
   return (
     <View style={styles.root}>
       <Image source={{ uri: HERO }} style={styles.hero} contentFit="cover" transition={300} />
@@ -73,6 +82,16 @@ export default function Home() {
           <Pressable testID="home-history-button" onPress={() => router.push("/history")} style={({ pressed }) => [styles.historyBtn, pressed && styles.cardPressed]}>
             <Feather name="clock" size={22} color={colors.brandPrimary} />
             <Text style={styles.historyText}>Storico chiamate</Text>
+            <Feather name="chevron-right" size={22} color={colors.muted} />
+          </Pressable>
+          <Pressable testID="home-contacts-button" onPress={() => router.push("/contacts")} style={({ pressed }) => [styles.historyBtn, styles.mtSm, pressed && styles.cardPressed]}>
+            <Feather name="users" size={22} color={colors.brandPrimary} />
+            <Text style={styles.historyText}>Rubrica</Text>
+            <Feather name="chevron-right" size={22} color={colors.muted} />
+          </Pressable>
+          <Pressable testID="home-intro-button" onPress={() => router.push("/welcome")} style={({ pressed }) => [styles.historyBtn, styles.mtSm, pressed && styles.cardPressed]}>
+            <Feather name="help-circle" size={22} color={colors.brandPrimary} />
+            <Text style={styles.historyText}>Come funziona</Text>
             <Feather name="chevron-right" size={22} color={colors.muted} />
           </Pressable>
         </Animated.View>
@@ -128,5 +147,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceTertiary,
   },
   historyText: { flex: 1, fontFamily: fonts.bold, fontSize: 17, color: colors.onSurface },
+  mtSm: { marginTop: spacing.sm },
   noteText: { flex: 1, fontFamily: fonts.regular, fontSize: 14, color: colors.muted, lineHeight: 20 },
 });
