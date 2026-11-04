@@ -4,7 +4,7 @@ where the two heads cross: one person wears the visor, the other does not."""
 import sys
 from PIL import Image, ImageChops, ImageDraw, ImageFilter
 
-INK = (14, 26, 43)
+INK = (78, 88, 104)  # soft grey-black
 
 
 def ramp(size, x0, x1, a0, a1):
@@ -41,7 +41,7 @@ def make(src, dst, bx, cy, r, rx):
     s = 4
     S = (W * s, H * s)
     X, Y, R, RX = bx * s, cy * s, r * s, rx * s
-    T, t = R * 0.045, R * 0.012  # thick / thin stroke
+    T, t = R * 0.032, R * 0.01  # thick / thin stroke
 
     # --- visor (blue head): Meta Quest-like front plate with nose arch, no lenses
     w, h = R * 1.0, R * 0.62
