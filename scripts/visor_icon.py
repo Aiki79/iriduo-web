@@ -1,21 +1,37 @@
-"""User's original icon + stylized VR visor on the blue head (fading out where it crosses
-into the centre) and eyes on the red head (the eye in the centre also faded):
-one person wears the visor, the other does not."""
+"""User's original icon + line-art VR visor on the blue head and line-art eyes on the red head.
+Strokes are bold on the outer side and get thinner (and lighter) towards the centre,
+where the two heads cross: one person wears the visor, the other does not."""
 import sys
 from PIL import Image, ImageChops, ImageDraw, ImageFilter
 
-NAVY = (14, 26, 43)
-CY = (92, 200, 224)
-CYL = (180, 235, 245)
+INK = (14, 26, 43)
 
 
-def hfade(size, x0, x1, a0=255, a1=40):
-    """Horizontal alpha ramp: a0 left of x0, a1 right of x1."""
+def ramp(size, x0, x1, a0, a1):
+    """Horizontal ramp: a0 left of x0, a1 right of x1 (x0 < x1)."""
     W, H = size
     row = [int(a0 if x <= x0 else a1 if x >= x1 else a0 + (a1 - a0) * (x - x0) / (x1 - x0)) for x in range(W)]
     g = Image.new("L", (W, 1))
     g.putdata(row)
     return g.resize((W, H))
+
+
+def strokes(size, draw_fn, width):
+    m = Image.new("L", size, 0)
+    draw_fn(ImageDraw.Draw(m), width)
+    return m
+
+
+def blend_widths(size, draw_fn, thick, thin, wmask, levels=12):
+    """Stroke width tapers from `thick` (wmask 255) to `thin` (wmask 0) in fine hard steps,
+    so the line gets thinner without grey halos."""
+    out = Image.new("L", size, 0)
+    for i in range(levels):
+        lo, hi = 256 * i // levels, 256 * (i + 1) // levels
+        band = wmask.point(lambda v, lo=lo, hi=hi: 255 if lo <= v < hi or (hi == 256 and v == 255) else 0)
+        width = thin + (thick - thin) * (i + 0.5) / levels
+        out = ImageChops.lighter(out, ImageChops.multiply(strokes(size, draw_fn, width), band))
+    return out
 
 
 def make(src, dst, bx, cy, r, rx):
@@ -24,40 +40,49 @@ def make(src, dst, bx, cy, r, rx):
     W, H = img.size
     s = 4
     S = (W * s, H * s)
+    X, Y, R, RX = bx * s, cy * s, r * s, rx * s
+    T, t = R * 0.075, R * 0.02  # thick / thin stroke
 
-    # visor on the blue head
-    ov = Image.new("RGBA", S, (0, 0, 0, 0))
-    d = ImageDraw.Draw(ov)
-    X, Y, R = bx * s, cy * s, r * s
-    w, h = R * 0.92, R * 0.6
+    # --- visor (blue head): outer frame, two lens outlines, strap stub
+    w, h = R * 1.0, R * 0.66
     top = Y - h * 0.62
-    d.rounded_rectangle((X - R * 1.2, top + h * 0.32, X + R * 1.2, top + h * 0.6), radius=int(h * 0.14), fill=CY + (255,))
-    d.rounded_rectangle((X - w, top, X + w, top + h), radius=int(h * 0.38), fill=CY + (255,))
-    d.rounded_rectangle((X - w * 0.8, top + h * 0.2, X + w * 0.8, top + h * 0.8), radius=int(h * 0.3), fill=NAVY + (255,))
-    d.rounded_rectangle((X - w * 0.62, top + h * 0.3, X - w * 0.2, top + h * 0.42), radius=int(h * 0.06), fill=CYL + (200,))
-    d.pieslice((X - h * 0.2, top + h * 0.62, X + h * 0.2, top + h * 1.02), 180, 360, fill=CY + (255,))
-    m = Image.new("L", S, 0)
-    ImageDraw.Draw(m).ellipse((X - R * 1.02, Y - R * 1.02, X + R * 1.02, Y + R * 1.02), fill=255)
-    # fade towards the centre of the icon, where the two heads cross
-    fade = hfade(S, (bx + r * 0.05) * s, (bx + r * 0.95) * s, 255, 35)
-    ov.putalpha(ImageChops.multiply(ImageChops.multiply(ov.getchannel("A"), m), fade))
+    lw, lh = w * 0.72, h * 0.5
 
-    # eyes on the red head; the one in the centre is faded too
-    eyes = Image.new("RGBA", S, (0, 0, 0, 0))
-    ed = ImageDraw.Draw(eyes)
-    er = R * 0.13
-    ey = Y - R * 0.12
-    for ex in (rx * s - R * 0.36, rx * s + R * 0.36):
-        ed.ellipse((ex - er, ey - er * 1.25, ex + er, ey + er * 1.25), fill=NAVY + (255,))
-        ed.ellipse((ex - er * 0.15, ey - er * 0.9, ex + er * 0.45, ey - er * 0.3), fill=(255, 255, 255, 200))
-    efade = hfade(S, (rx - r * 0.55) * s, (rx + r * 0.1) * s, 70, 255)
-    eyes.putalpha(ImageChops.multiply(eyes.getchannel("A"), efade))
+    def visor(d, sw):
+        sw = max(1, int(sw))
+        d.rounded_rectangle((X - w, top, X + w, top + h), radius=int(h * 0.42), outline=255, width=sw)
+        for lx in (X - w * 0.84, X + w * 0.12):
+            d.rounded_rectangle((lx, top + (h - lh) / 2, lx + lw, top + (h + lh) / 2), radius=int(lh * 0.5), outline=255, width=sw)
+        d.line((X - R * 1.3, top + h * 0.5, X - w, top + h * 0.5), fill=255, width=sw)
 
-    layer = Image.alpha_composite(eyes, ov).resize((W, H), Image.LANCZOS)
-    sh = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    sh.putalpha(layer.getchannel("A").point(lambda v: int(v * 0.4)))
-    sh = sh.filter(ImageFilter.GaussianBlur(r * 0.06))
-    Image.alpha_composite(Image.alpha_composite(img, sh), layer).save(dst)
+    vw = ramp(S, X - w, X + w * 0.9, 255, 0)  # thick on the outer (left) side
+    vmask = blend_widths(S, visor, T, t, vw)
+    vmask = ImageChops.multiply(vmask, ramp(S, X - w * 0.2, X + w * 1.05, 255, 90))  # lighter towards the centre
+    head = Image.new("L", S, 0)
+    ImageDraw.Draw(head).ellipse((X - R * 1.03, Y - R * 1.03, X + R * 1.03, Y + R * 1.03), fill=255)
+    vmask = ImageChops.multiply(vmask, head)
+
+    # --- eyes (red head): almond outline + small pupil ring
+    er = R * 0.2
+    ey = Y - R * 0.1
+    centres = (RX - R * 0.38, RX + R * 0.38)
+
+    def eyes(d, sw):
+        sw = max(1, int(sw))
+        for ex in centres:
+            d.ellipse((ex - er, ey - er * 0.72, ex + er, ey + er * 0.72), outline=255, width=sw)
+            d.ellipse((ex - er * 0.32, ey - er * 0.32, ex + er * 0.32, ey + er * 0.32), fill=255)
+
+    ew = ramp(S, RX - R * 0.6, RX + R * 0.55, 0, 255)  # thick on the outer (right) side
+    emask = blend_widths(S, eyes, T * 0.8, t, ew)
+    emask = ImageChops.multiply(emask, ramp(S, RX - R * 0.65, RX + R * 0.15, 90, 255))
+
+    mask = ImageChops.lighter(vmask, emask).resize((W, H), Image.LANCZOS)
+    ink = Image.new("RGBA", (W, H), INK + (255,))
+    ink.putalpha(mask)
+    soft = Image.new("RGBA", (W, H), (255, 255, 255, 0))
+    soft.putalpha(mask.filter(ImageFilter.GaussianBlur(r * 0.04)).point(lambda v: int(v * 0.35)))
+    Image.alpha_composite(Image.alpha_composite(img, soft), ink).save(dst)
 
 
 if __name__ == "__main__":
