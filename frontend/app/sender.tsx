@@ -1,6 +1,6 @@
 import { Feather } from "@react-native-vector-icons/feather";
 import { useCameraPermissions, useMicrophonePermissions } from "expo-camera";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Linking, Platform, StyleSheet, Text, TextInput, View } from "react-native";
 import { KeyboardAwareScrollView, KeyboardStickyView } from "react-native-keyboard-controller";
@@ -18,6 +18,7 @@ import { addRecentCode, getRecentCodes } from "@/src/recent";
 import { getContacts, nameFor, type Contact } from "@/src/contacts";
 import { ChunkReceiver } from "@/src/media";
 import { GuestsPanel } from "@/src/components/GuestsPanel";
+import { callsLeft, countCall, FREE_REACTIONS, FREE_RESOLUTION, useProState } from "@/src/pro";
 import { colors, fonts, radius, spacing } from "@/src/theme";
 
 const GUEST_MSG: Record<string, string> = {
@@ -112,7 +113,13 @@ function SenderBody() {
   const [mics, setMics] = useState<Device[]>([]);
   const [camId, setCamId] = useState("");
   const [micId, setMicId] = useState("");
+  const router = useRouter();
+  const proState = useProState();
+  const pro = proState.pro;
   const [res, setRes] = useState("3840x1920");
+  useEffect(() => {
+    if (proState.ready && !pro) setRes(FREE_RESOLUTION);
+  }, [pro, proState.ready]);
   const [bitrate, setBitrate] = useState(20000000);
   const [code, setCode] = useState("");
   const [recent, setRecent] = useState<string[]>([]);
@@ -147,7 +154,7 @@ function SenderBody() {
         .then((j) => alive && setOnline(Array.isArray(j.online) ? j.online : []))
         .catch(() => {});
     check();
-    const id = setInterval(check, 10000);
+    const id = setInterval(check, 5000);
     return () => {
       alive = false;
       clearInterval(id);
@@ -239,12 +246,17 @@ function SenderBody() {
     const target = linkRef.current;
     if (!camReady || !target || autoDoneRef.current || phase !== "idle" || code !== target) return;
     autoDoneRef.current = true;
+    if (callsLeft(proState) === 0) {
+      setStatus("Hai finito le chiamate gratuite di questo mese. Passa a Pro per chiamare ancora.");
+      setTone("error");
+      return;
+    }
     setStatus(`Chiamo automaticamente il visore ${target}…`);
     setTone("info");
     pendingRef.current = { code: target, at: Date.now() };
     addRecentCode(target).then(setRecent);
     stage.current?.send({ type: "call", code: target });
-  }, [camReady, phase, code]);
+  }, [camReady, phase, code, proState]);
 
   const sendConfig = useCallback(() => {
     if (camId) stage.current?.send({ type: "config", cfg: { cam: camId, mic: micId, res, bitrate: effBitrate } });
@@ -291,6 +303,7 @@ function SenderBody() {
           setPhase("live");
           setStartedAt((t) => t ?? Date.now());
           if (!callRef.current) {
+            countCall();
             callRef.current = { at: Date.now(), counts: {} };
             setMessages([]);
           }
@@ -388,6 +401,10 @@ function SenderBody() {
       return;
     }
     if (target) setCode(target);
+    if (callsLeft(proState) === 0) {
+      router.push("/pro");
+      return;
+    }
     setRecent(await addRecentCode(c));
     pendingRef.current = { code: c, at: Date.now() };
     stage.current?.send({ type: "call", code: c });
@@ -464,10 +481,10 @@ function SenderBody() {
             <Btn
               compact
               testID="sender-record-button"
-              label={recAt ? `Ferma ${formatDuration(recNow - recAt)}` : "Registra la tua trasmissione"}
-              icon={recAt ? "stop-circle" : "circle"}
+              label={recAt ? `Ferma ${formatDuration(recNow - recAt)}` : pro ? "Registra la tua trasmissione" : "Registra · solo con Pro"}
+              icon={recAt ? "stop-circle" : pro ? "circle" : "lock"}
               variant={recAt ? "danger" : "secondary"}
-              onPress={() => stage.current?.send({ type: recAt ? "recStop" : "recStart" })}
+              onPress={() => (!pro ? router.push("/pro") : stage.current?.send({ type: recAt ? "recStop" : "recStart" }))}
             />
           </View>
         ) : null}
@@ -479,7 +496,7 @@ function SenderBody() {
         {phase === "live" ? (
           <View style={styles.statsWrap}>
             <Label>Reazioni</Label>
-            <ReactionBar onReact={react} testID="sender-reactions" />
+            <ReactionBar onReact={react} testID="sender-reactions" unlocked={pro ? undefined : FREE_REACTIONS} onLocked={() => router.push("/pro")} />
           </View>
         ) : null}
         {phase === "live" ? (
@@ -553,7 +570,14 @@ function SenderBody() {
           <Label>Risoluzione</Label>
           <ChipRow testID="sender-resolution-chips">
             {RESOLUTIONS.map((r) => (
-              <Chip key={r.value} testID={`sender-resolution-${r.value}`} label={r.label} selected={res === r.value} onPress={() => setRes(r.value)} />
+              <Chip
+                key={r.value}
+                testID={`sender-resolution-${r.value}`}
+                icon={!pro && r.value !== FREE_RESOLUTION ? "lock" : undefined}
+                label={!pro && r.value !== FREE_RESOLUTION ? `${r.label.split(" ·")[0]} · Pro` : r.label}
+                selected={res === r.value}
+                onPress={() => (!pro && r.value !== FREE_RESOLUTION ? router.push("/pro") : setRes(r.value))}
+              />
             ))}
           </ChipRow>
         </View>

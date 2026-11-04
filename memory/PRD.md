@@ -53,3 +53,10 @@
 - Rubrica: nomi lunghi troncati, pulsanti sempre visibili (testato a 320px)
 - Pannello ospiti: nomi e chip troncati su schermi piccoli
 - Chat mittente: spazio extra sotto la chat per non toccare per errore 'Chiudi chiamata'
+
+## Jun 2026 - IriDuo Pro (prova), icona, presenza, galleria
+- Nome: IriDuo. Icona: quella originale dell'utente + visore stilizzato sulla testa blu (scripts/visor_icon.py)
+- Pro in MODALITÀ PROVA (src/pro.ts, app/pro.tsx): 6,99€/mese o 59,99€/anno, nessun pagamento reale (RevenueCat saltato dall'utente)
+- Gratis: 3 chiamate/mese, solo HD, storico ultime 3, 3 reazioni, niente foto 3D/registrazioni. Pro: tutto sbloccato
+- Presenza: ping 8s, scadenza 20s, uscita su visibilitychange/pagehide; mittente controlla ogni 5s
+- Galleria: filtri Tutti/Foto/Video, anteprima foto a schermo intero

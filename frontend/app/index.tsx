@@ -8,6 +8,7 @@ import Animated, { FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { IconName } from "@/src/components/ui";
+import { useProState } from "@/src/pro";
 import { colors, fonts, radius, spacing } from "@/src/theme";
 import { storage } from "@/src/utils/storage";
 
@@ -36,6 +37,7 @@ function RoleCard({ title, text, icon, onPress, testID, delay }: { title: string
 export default function Home() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { pro } = useProState();
   useEffect(() => {
     storage.getItem(ONBOARDED_KEY, false).then((v) => {
       if (!v) router.replace("/welcome");
@@ -85,7 +87,12 @@ export default function Home() {
         </View>
 
         <Animated.View entering={FadeInDown.delay(300).duration(420)}>
-          <Pressable testID="home-history-button" onPress={() => router.push("/history")} style={({ pressed }) => [styles.historyBtn, pressed && styles.cardPressed]}>
+          <Pressable testID="home-pro-button" onPress={() => router.push("/pro")} style={({ pressed }) => [styles.historyBtn, styles.proBtn, pressed && styles.cardPressed]}>
+            <Feather name="star" size={22} color={colors.brandPrimary} />
+            <Text style={styles.historyText}>{pro ? "IriDuo Pro · attivo" : "IriDuo Pro · 4K e storico completo"}</Text>
+            <Feather name="chevron-right" size={22} color={colors.muted} />
+          </Pressable>
+          <Pressable testID="home-history-button" onPress={() => router.push("/history")} style={({ pressed }) => [styles.historyBtn, styles.mtSm, pressed && styles.cardPressed]}>
             <Feather name="clock" size={22} color={colors.brandPrimary} />
             <Text style={styles.historyText}>Storico chiamate</Text>
             <Feather name="chevron-right" size={22} color={colors.muted} />
@@ -161,5 +168,6 @@ const styles = StyleSheet.create({
   },
   historyText: { flex: 1, fontFamily: fonts.bold, fontSize: 17, color: colors.onSurface },
   mtSm: { marginTop: spacing.sm },
+  proBtn: { borderColor: colors.brandPrimary },
   noteText: { flex: 1, fontFamily: fonts.regular, fontSize: 14, color: colors.muted, lineHeight: 20 },
 });

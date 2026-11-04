@@ -111,7 +111,7 @@ async def presence_check(codes: str = Query("", max_length=200)):
     wanted = [c for c in codes.split(",") if re.fullmatch(r"\d{6}", c)][:20]
     if not wanted:
         return {"online": []}
-    since = datetime.now(timezone.utc) - timedelta(seconds=45)
+    since = datetime.now(timezone.utc) - timedelta(seconds=20)
     docs = await db.presence.find({"code": {"$in": wanted}, "updated_at": {"$gte": since}}, {"_id": 0, "code": 1}).to_list(20)
     return {"online": [d["code"] for d in docs]}
 

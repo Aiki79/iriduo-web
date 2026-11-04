@@ -21,25 +21,35 @@ export type FloatingReaction = { id: string; kind: string };
 
 export const newReaction = (kind: string): FloatingReaction => ({ id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, kind });
 
-export function ReactionBar({ onReact, testID, compact }: { onReact: (kind: string) => void; testID: string; compact?: boolean }) {
+/** `unlocked` = how many reactions are free; the rest show a lock and call `onLocked`. */
+export function ReactionBar({ onReact, testID, compact, unlocked = REACTIONS.length, onLocked }: { onReact: (kind: string) => void; testID: string; compact?: boolean; unlocked?: number; onLocked?: () => void }) {
   const size = compact ? 44 : 52;
   return (
     <View style={styles.bar} testID={testID}>
-      {REACTIONS.map((r) => (
-        <Pressable
-          key={r.kind}
-          testID={`${testID}-${r.kind}`}
-          accessibilityRole="button"
-          accessibilityLabel={`Invia reazione: ${r.label}`}
-          onPress={() => {
-            if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            onReact(r.kind);
-          }}
-          style={({ pressed }) => [styles.btn, { width: size, height: size }, compact && styles.btnCompact, pressed && styles.pressed]}
-        >
-          <MaterialDesignIcons name={r.icon} size={compact ? 22 : 26} color={r.color} />
-        </Pressable>
-      ))}
+      {REACTIONS.map((r, i) => {
+        const locked = i >= unlocked;
+        return (
+          <Pressable
+            key={r.kind}
+            testID={`${testID}-${r.kind}${locked ? "-locked" : ""}`}
+            accessibilityRole="button"
+            accessibilityLabel={locked ? `${r.label}: disponibile con Pro` : `Invia reazione: ${r.label}`}
+            onPress={() => {
+              if (locked) return onLocked?.();
+              if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              onReact(r.kind);
+            }}
+            style={({ pressed }) => [styles.btn, { width: size, height: size }, compact && styles.btnCompact, locked && styles.locked, pressed && styles.pressed]}
+          >
+            <MaterialDesignIcons name={r.icon} size={compact ? 22 : 26} color={r.color} />
+            {locked ? (
+              <View style={styles.lock}>
+                <MaterialDesignIcons name="lock" size={12} color={colors.onSurface} />
+              </View>
+            ) : null}
+          </Pressable>
+        );
+      })}
     </View>
   );
 }
@@ -87,6 +97,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   btnCompact: { backgroundColor: colors.scrim },
+  locked: { opacity: 0.55 },
+  lock: { position: "absolute", right: -2, bottom: -2, width: 20, height: 20, borderRadius: 10, backgroundColor: colors.brandSecondary, alignItems: "center", justifyContent: "center" },
   pressed: { transform: [{ scale: 0.88 }], borderColor: colors.brandPrimary },
   floater: { position: "absolute", bottom: spacing.sm, marginLeft: -17 },
 });

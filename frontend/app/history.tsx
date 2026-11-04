@@ -9,6 +9,7 @@ import { formatDuration } from "@/src/components/CallStats";
 import { Btn, Header, IconBtn } from "@/src/components/ui";
 import { clearHistory, getHistory, RESULT_LABEL, type CallRecord } from "@/src/history";
 import { getContacts, nameFor, type Contact } from "@/src/contacts";
+import { FREE_HISTORY, useProState } from "@/src/pro";
 import { colors, fonts, radius, spacing } from "@/src/theme";
 
 const QUALITY_COLOR: Record<string, string> = { Buona: colors.success, Media: colors.warning, Debole: colors.error };
@@ -88,6 +89,9 @@ export default function History() {
     }, []),
   );
 
+  const { pro } = useProState();
+  const hidden = !pro && items ? Math.max(0, items.length - FREE_HISTORY) : 0;
+  const shown = pro ? items : items?.slice(0, FREE_HISTORY);
   const total = items?.filter((i) => i.result === "completata").reduce((a, i) => a + i.duration, 0) ?? 0;
 
   return (
@@ -118,7 +122,18 @@ export default function History() {
       )}
       <FlatList
         testID="history-list"
-        data={items ?? []}
+        data={shown ?? []}
+        ListFooterComponent={
+          !pro && items && items.length > 0 ? (
+            <Pressable testID="history-pro-banner" onPress={() => router.push("/pro")} style={({ pressed }) => [styles.proBanner, pressed && styles.pressed]}>
+              <Feather name="lock" size={18} color={colors.brandPrimary} />
+              <Text style={styles.proText}>
+                {hidden > 0 ? `Altre ${hidden} chiamate nascoste. ` : ""}Con Pro vedi lo storico completo.
+              </Text>
+              <Feather name="chevron-right" size={20} color={colors.muted} />
+            </Pressable>
+          ) : undefined
+        }
         keyExtractor={(i) => i.id}
         renderItem={({ item, index }) => <Row item={item} index={index} name={nameFor(contacts, item.code)} />}
         contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + spacing.xl }]}
@@ -180,6 +195,8 @@ const styles = StyleSheet.create({
   },
   recallText: { fontFamily: fonts.bold, fontSize: 14, color: colors.onBrandPrimary },
   pressed: { opacity: 0.8, transform: [{ scale: 0.97 }] },
+  proBanner: { flexDirection: "row", alignItems: "center", gap: spacing.sm, minHeight: 56, paddingHorizontal: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: colors.brandPrimary, backgroundColor: colors.surfaceTertiary },
+  proText: { flex: 1, fontFamily: fonts.bold, fontSize: 14, lineHeight: 19, color: colors.onSurface },
   confirm: { marginHorizontal: spacing.lg, marginBottom: spacing.sm, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.surfaceTertiary, gap: spacing.sm },
   confirmText: { fontFamily: fonts.bold, fontSize: 16, color: colors.onSurface },
   confirmRow: { flexDirection: "row", gap: spacing.sm },

@@ -1,0 +1,36 @@
+{
+  "summary": "Iteration 14 – IriDuo Pro (DEMO), free limits, presence fast-exit. Backend: 53/53 pytest pass (added 2 presence TTL tests: stale >20s goes offline, re-ping keeps online). Frontend (375x667, two browser contexts w/ fake camera): Home pro button texts free/pro + nav to /pro OK; /pro demo banner, 'Ti restano 10 chiamate gratuite questo mese.', plan selection, activate→confirm(cancel/yes)→pro-active, persists after reload, deactivate back to free OK. History free shows 3 rows + 'Altre 3 chiamate nascoste.' banner → /pro; pro shows all 6, no banner; free with 2 calls shows banner without hidden text. Sender free: HD selected, 4K/2,9K chips show 'Pro' with lock and navigate to /pro; pro: all selectable (4K applied, effective 3840x1920). hdCalls=10 → Chiama navigates to /pro (shows 0 calls left). Live call free: hdCalls 0→1 on connect, heart/clap/star work, like/wow -locked → /pro on both sides, sender 'Registra · solo con Pro' → /pro, viewer 'Foto 3D · Pro' / 'Registra · Pro' → /pro; call survives navigating to /pro and back. Pro call: no locked reactions, like/wow work, viewer snapshot saved, sender & viewer recording start/stop saved, hdCalls not incremented. Chat sender→viewer and hangup OK. Presence: after hangup viewer appears in sender-waiting chip; closing viewer tab removes chip in ~2s; visibilitychange hidden removes chip in ~2s and stays removed; visible again re-adds it. Gallery web shows gallery-empty (native filters/preview not testable on web). No deprecated expo packages found.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "DELETE /api/presence/{code}", "issue": "Unauthenticated: anyone knowing a 6-digit code can mark a viewer offline (low risk, by design no auth)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Home", "issues": ["home-pro-button has marginBottom 8 + history button marginTop 16 => 24px gap, while other menu buttons are 8px apart (inconsistent spacing). Pro button is also below the fold at 375x667 (y≈734)."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_presence.py", "/app/test_reports/pytest/pytest_results_iter14.xml"],
+  "action_items": [
+    "(Low) sender.tsx:119-122 – useEffect(() => { if (!pro) setRes(FREE_RESOLUTION) }, [pro]) runs with pro=false if pro_state hasn't loaded yet from storage (possible on native AsyncStorage cold start) → Pro users would start on HD instead of 4K default. Not reproduced on web. Consider gating on a 'loaded' flag.",
+    "(Low) src/pro.ts:23 thisMonth uses toISOString (UTC) – monthly free counter resets at UTC month boundary, not local time (Italy: 1-2h off).",
+    "(Low) Home spacing: align home-pro-button spacing with other menu buttons."
+  ],
+  "critical_code_review_comments": [
+    "Free call counter only increments on the sender 'connected' event; calls received by the viewer are not counted – confirm this matches the intended '10 chiamate/mese' rule.",
+    "Pro state is purely local (localStorage pro_state) – expected for DEMO mode, trivially bypassable; must be replaced by store receipts before real billing.",
+    "sender.tsx is 691 lines and viewer.tsx 618 – near the 700-line limit; consider extracting call/pro gating hooks.",
+    "Storage layer double-JSON-encodes values on web (localStorage value is a JSON string of a JSON string) – note for anyone seeding test data."
+  ],
+  "updated_files": ["/app/backend/tests/test_presence.py"],
+  "success_rate": {"backend": "100%", "frontend": "100% of requested flows (gallery filters/preview native-only, not tested)"},
+  "seed_data_creation": "Only per-browser-context localStorage (call_history with TEST_h* ids, pro_state). Backend presence test codes are deleted in fixture teardown.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "browser_automation tool's browser already has fake media; create contexts via page.context.browser.new_context(permissions=['camera','microphone']) + add_init_script for onboarded. Seed storage with localStorage.setItem(k, JSON.stringify(JSON.stringify(value))) (double-encoded). Screenshot paths must end .jpeg when using quality. Chat testIDs: sender-chat-composer-input / sender-chat-composer-send-button. Run backend tests with EXPO_PUBLIC_BACKEND_URL env set. Browser clock in tool is 2026-11.",
+  "rca_of_issue": ""
+}

@@ -2,10 +2,10 @@ import { Feather } from "@react-native-vector-icons/feather";
 import { Image } from "expo-image";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
-import { FlatList, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { FlatList, Modal, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { Header } from "@/src/components/ui";
+import { Btn, Chip, ChipRow, Header } from "@/src/components/ui";
 import { deleteMemory, listMemories, shareFile, type Memory } from "@/src/media";
 import { colors, fonts, radius, spacing } from "@/src/theme";
 
@@ -26,6 +26,8 @@ export default function Gallery() {
   const router = useRouter();
   const [items, setItems] = useState<Memory[]>([]);
   const [confirm, setConfirm] = useState<string | null>(null);
+  const [filter, setFilter] = useState<"all" | "photo" | "video">("all");
+  const [preview, setPreview] = useState<Memory | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -33,23 +35,63 @@ export default function Gallery() {
     }, []),
   );
 
+  const photos = items.filter((i) => i.kind === "photo").length;
+  const shown = filter === "all" ? items : items.filter((i) => i.kind === filter);
+  const open3D = (item: Memory) => router.push({ pathname: "/viewer", params: item.kind === "photo" ? { photo: item.name } : { video: item.name } });
+
   return (
     <View style={styles.root} testID="gallery-screen">
       <Header title="Ricordi 3D" />
+      {items.length > 0 ? (
+        <View style={styles.filters}>
+          <ChipRow testID="gallery-filters">
+            <Chip testID="gallery-filter-all" label={`Tutti · ${items.length}`} selected={filter === "all"} onPress={() => setFilter("all")} />
+            <Chip testID="gallery-filter-photo" icon="camera" label={`Foto · ${photos}`} selected={filter === "photo"} onPress={() => setFilter("photo")} />
+            <Chip testID="gallery-filter-video" icon="film" label={`Video · ${items.length - photos}`} selected={filter === "video"} onPress={() => setFilter("video")} />
+          </ChipRow>
+        </View>
+      ) : null}
+      <Modal visible={!!preview} transparent animationType="fade" onRequestClose={() => setPreview(null)}>
+        <View style={[styles.modal, { paddingTop: insets.top + spacing.md, paddingBottom: insets.bottom + spacing.md }]} testID="gallery-preview">
+          {preview ? <Image source={{ uri: preview.uri }} style={styles.big} contentFit="contain" /> : null}
+          <View style={styles.modalRow}>
+            <Btn compact testID="gallery-preview-close" label="Chiudi" icon="x" onPress={() => setPreview(null)} style={styles.flex} />
+            <Btn
+              compact
+              testID="gallery-preview-3d"
+              label="Guarda in 3D"
+              icon="eye"
+              variant="primary"
+              style={styles.flex}
+              onPress={() => {
+                const p = preview;
+                setPreview(null);
+                if (p) open3D(p);
+              }}
+            />
+          </View>
+        </View>
+      </Modal>
       <FlatList
         testID="gallery-list"
-        data={items}
+        data={shown}
         keyExtractor={(i) => i.name}
         contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + spacing.xl }]}
         renderItem={({ item }) => (
           <View style={styles.card} testID={`gallery-item-${item.name}`}>
-            {item.kind === "photo" ? (
-              <Image source={{ uri: item.uri }} style={styles.thumb} contentFit="cover" />
-            ) : (
-              <View style={[styles.thumb, styles.videoThumb]}>
-                <Feather name="film" size={32} color={colors.brandPrimary} />
-              </View>
-            )}
+            <Pressable
+              testID={`gallery-thumb-${item.name}`}
+              accessibilityLabel={item.kind === "photo" ? "Ingrandisci foto" : "Guarda il video in 3D"}
+              onPress={() => (item.kind === "photo" ? setPreview(item) : open3D(item))}
+            >
+              {item.kind === "photo" ? (
+                <Image source={{ uri: item.uri }} style={styles.thumb} contentFit="cover" />
+              ) : (
+                <View style={[styles.thumb, styles.videoThumb]}>
+                  <Feather name="play-circle" size={32} color={colors.brandPrimary} />
+                </View>
+              )}
+            </Pressable>
             <View style={styles.info}>
               <Text style={styles.title}>{item.kind === "photo" ? "Foto 3D" : "Video della chiamata"}</Text>
               <Text style={styles.meta} numberOfLines={1}>
@@ -60,7 +102,7 @@ export default function Gallery() {
                   testID={`gallery-view-${item.name}`}
                   icon="eye"
                   label="Guarda in 3D"
-                  onPress={() => router.push({ pathname: "/viewer", params: item.kind === "photo" ? { photo: item.name } : { video: item.name } })}
+                  onPress={() => open3D(item)}
                 />
                 <Action testID={`gallery-share-${item.name}`} icon="share-2" label="Condividi" onPress={() => shareFile(item.uri, item.kind === "photo" ? "image/jpeg" : "video/mp4")} />
                 {confirm === item.name ? (
@@ -100,6 +142,11 @@ export default function Gallery() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.surface },
+  flex: { flex: 1 },
+  filters: { paddingHorizontal: spacing.lg },
+  modal: { flex: 1, backgroundColor: colors.stage, paddingHorizontal: spacing.md, gap: spacing.md },
+  big: { flex: 1, width: "100%" },
+  modalRow: { flexDirection: "row", gap: spacing.sm },
   list: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm, gap: spacing.md, flexGrow: 1 },
   card: { flexDirection: "row", gap: spacing.md, backgroundColor: colors.surfaceSecondary, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, padding: spacing.sm },
   thumb: { width: 128, height: 64, borderRadius: radius.sm, backgroundColor: colors.stage },

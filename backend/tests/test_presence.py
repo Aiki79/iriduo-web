@@ -64,3 +64,22 @@ class TestRename:
         r = s.get(f"{BASE_URL}/api/join", params={"code": "123456"})
         assert r.status_code == 200
         assert "<title>IriDuo · codice 123456</title>" in r.text
+
+
+# Iteration 14: presence TTL – a code is online only if pinged within the last 20s
+class TestPresenceTTL:
+    def test_stale_ping_goes_offline_after_20s(self, s, code):
+        import time
+        assert s.post(f"{BASE_URL}/api/presence", json={"code": code}).status_code == 200
+        time.sleep(12)
+        assert s.get(f"{BASE_URL}/api/presence", params={"codes": code}).json()["online"] == [code]
+        time.sleep(10)
+        assert s.get(f"{BASE_URL}/api/presence", params={"codes": code}).json()["online"] == []
+
+    def test_reping_keeps_online(self, s, code):
+        import time
+        s.post(f"{BASE_URL}/api/presence", json={"code": code})
+        time.sleep(12)
+        s.post(f"{BASE_URL}/api/presence", json={"code": code})
+        time.sleep(12)
+        assert s.get(f"{BASE_URL}/api/presence", params={"codes": code}).json()["online"] == [code]

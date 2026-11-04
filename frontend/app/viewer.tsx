@@ -5,7 +5,7 @@ import * as ScreenOrientation from "expo-screen-orientation";
 import { DeviceMotion } from "expo-sensors";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { storage } from "@/src/utils/storage";
 import { AppState, Linking, Platform, StyleSheet, Text, View } from "react-native";
 import { KeyboardAwareScrollView, KeyboardStickyView } from "react-native-keyboard-controller";
@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StageView } from "@/src/components/StageView";
 import { ChatComposer, ChatPanel, ChatToasts, newMessage, type ChatMessage } from "@/src/components/CallChat";
 import { ReactionBar } from "@/src/components/Reactions";
+import { FREE_REACTIONS, useProState } from "@/src/pro";
 import { ChunkReceiver, readMemoryBase64, saveAndShare, sendVideoFile } from "@/src/media";
 import { CallPill, CallStatsCard, formatDuration, quality, type CallStatsData } from "@/src/components/CallStats";
 import { addCall, topQuality } from "@/src/history";
@@ -91,11 +92,18 @@ export default function Viewer() {
     const ping = () =>
       fetch(base, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code }) }).catch(() => {});
     ping();
-    const id = setInterval(ping, 20000);
-    if (isWeb) window.addEventListener("pagehide", leave);
+    const id = setInterval(ping, 8000);
+    const vis = () => (document.visibilityState === "hidden" ? leave() : ping());
+    if (isWeb) {
+      window.addEventListener("pagehide", leave);
+      document.addEventListener("visibilitychange", vis);
+    }
     return () => {
       clearInterval(id);
-      if (isWeb) window.removeEventListener("pagehide", leave);
+      if (isWeb) {
+        window.removeEventListener("pagehide", leave);
+        document.removeEventListener("visibilitychange", vis);
+      }
       leave();
     };
   }, [code, phase, appActive]);
@@ -130,6 +138,14 @@ export default function Viewer() {
   );
 
   const react = useCallback((kind: string) => send({ type: "react", kind }), [send]);
+  const router = useRouter();
+  const { pro } = useProState();
+  const goPro = useCallback(() => {
+    setFull(false);
+    router.push("/pro");
+  }, [router]);
+  const snap = () => (pro ? send({ type: "snapshot" }) : goPro());
+  const rec = () => (pro ? send({ type: recAt ? "recStop" : "recStart" }) : goPro());
 
   const onEvent = useCallback(
     (e: StageEvent) => {
@@ -382,7 +398,7 @@ export default function Viewer() {
         ) : null}
         {full && phase === "connected" && !composerOpen ? (
           <View style={[styles.fullReactions, { bottom: Math.max(insets.bottom, spacing.md) }]}>
-            <ReactionBar compact onReact={react} testID="viewer-fullscreen-reactions" />
+            <ReactionBar compact onReact={react} testID="viewer-fullscreen-reactions" unlocked={pro ? undefined : FREE_REACTIONS} onLocked={goPro} />
           </View>
         ) : null}
         {full ? (
@@ -392,14 +408,14 @@ export default function Viewer() {
             <View style={styles.row}>
               {motion && <IconBtn icon="crosshair" label="Ricentra" testID="viewer-recenter-fullscreen-button" onPress={() => send({ type: "recenter" })} />}
               {phase === "connected" && (
-                <IconBtn icon="camera" label="Foto 3D" testID="viewer-snapshot-fullscreen-button" onPress={() => send({ type: "snapshot" })} />
+                <IconBtn icon="camera" label="Foto 3D" testID="viewer-snapshot-fullscreen-button" onPress={snap} />
               )}
               {phase === "connected" && (
                 <IconBtn
                   icon={recAt ? "stop-circle" : "circle"}
                   label={recAt ? "Ferma registrazione" : "Registra"}
                   testID="viewer-record-fullscreen-button"
-                  onPress={() => send({ type: recAt ? "recStop" : "recStart" })}
+                  onPress={rec}
                 />
               )}
               {phase === "connected" && (
@@ -457,15 +473,15 @@ export default function Viewer() {
             <View style={styles.mt}>
               <Label>Ricordi 3D</Label>
               <View style={styles.row}>
-                <Btn compact testID="viewer-snapshot-button" label="Foto 3D" icon="camera" onPress={() => send({ type: "snapshot" })} style={styles.flex} />
+                <Btn compact testID="viewer-snapshot-button" label={pro ? "Foto 3D" : "Foto 3D · Pro"} icon={pro ? "camera" : "lock"} onPress={snap} style={styles.flex} />
                 {phase === "connected" ? (
                   <Btn
                     compact
                     testID="viewer-record-button"
-                    label={recAt ? `Ferma ${formatDuration(recNow - recAt)}` : "Registra"}
-                    icon={recAt ? "stop-circle" : "circle"}
+                    label={recAt ? `Ferma ${formatDuration(recNow - recAt)}` : pro ? "Registra" : "Registra · Pro"}
+                    icon={recAt ? "stop-circle" : pro ? "circle" : "lock"}
                     variant={recAt ? "danger" : "secondary"}
-                    onPress={() => send({ type: recAt ? "recStop" : "recStart" })}
+                    onPress={rec}
                     style={styles.flex}
                   />
                 ) : null}
@@ -480,7 +496,7 @@ export default function Viewer() {
           {phase === "connected" ? (
             <View style={styles.mt}>
               <Label>Reazioni nella scena 3D</Label>
-              <ReactionBar onReact={react} testID="viewer-reactions" />
+              <ReactionBar onReact={react} testID="viewer-reactions" unlocked={pro ? undefined : FREE_REACTIONS} onLocked={goPro} />
             </View>
           ) : null}
           {phase === "connected" ? <ChatPanel messages={messages} onSend={sendChat} testID="viewer-chat" /> : null}
