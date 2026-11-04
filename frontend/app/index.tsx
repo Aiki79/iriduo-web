@@ -52,7 +52,7 @@ export default function Home() {
             <Text style={styles.badgeText}>VIDEOCHIAMATA 3D</Text>
           </View>
           <Text style={styles.title} testID="home-title">
-            BiLume
+            IriDuo
           </Text>
           <Text style={styles.slogan} testID="home-slogan">
             a tu per tu, in 3D

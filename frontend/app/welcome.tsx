@@ -45,7 +45,7 @@ export default function Welcome() {
     <View style={[styles.root, { paddingTop: insets.top + spacing.lg, paddingBottom: insets.bottom + spacing.xl }]} testID="welcome-screen">
       <View style={styles.top}>
         <View>
-          <Text style={styles.brand}>BILUME</Text>
+          <Text style={styles.brand}>IRIDUO</Text>
           <Text style={styles.slogan} testID="welcome-slogan">
             a tu per tu, in 3D · face to face, in 3D
           </Text>

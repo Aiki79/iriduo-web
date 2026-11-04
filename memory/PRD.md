@@ -14,9 +14,9 @@
 - Native: expo-sensors DeviceMotion for looking around, expo-screen-orientation for landscape fullscreen, expo-camera permissions, recent codes stored locally
 
 ## Implemented (2026-06)
-- Slogan "BiLume — a tu per tu, in 3D" / "face to face, in 3D" on home, welcome, share message and join page
+- Slogan "IriDuo — a tu per tu, in 3D" / "face to face, in 3D" on home, welcome, share message and join page
 - Presence: TTL/unique indexes in INDEXES, leave on background (AppState) and pagehide (keepalive); main viewer excluded from guest suggestions
-- App renamed **BiLume** (app.json name, home, welcome, share message, join page). Bundle identifier unchanged
+- App renamed **IriDuo** (app.json name, home, welcome, share message, join page). Bundle identifier unchanged
 - Group chat: the sender forwards each viewer's messages to the other viewers (label "Visore X" / contact name)
 - Waiting room: /api/presence (POST ping every 20s from a waiting viewer, DELETE on leave, GET ?codes= only for known codes, TTL 120s). The sender shows "In attesa ora" with one-tap call, plus online suggestions in the guest panel
 - Gallery videos in 3D: the recording is sent to the stage in base64 chunks (vidChunk) and played on the 3D sphere

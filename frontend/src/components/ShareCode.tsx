@@ -12,7 +12,7 @@ const joinLink = (code: string) =>
   `${process.env.EXPO_PUBLIC_BACKEND_URL}/api/join?code=${code}&app=${encodeURIComponent(ExpoLinking.createURL("/"))}`;
 
 const message = (code: string) =>
-  `Ti aspetto su BiLume — a tu per tu, in 3D! Il codice del mio visore è ${code}. Tocca il link per aprire l'app e chiamarmi in 3D: ${joinLink(code)}`;
+  `Ti aspetto su IriDuo — a tu per tu, in 3D! Il codice del mio visore è ${code}. Tocca il link per aprire l'app e chiamarmi in 3D: ${joinLink(code)}`;
 
 function ShareBtn({ label, icon, onPress, testID, bg, fg, border }: { label: string; icon: IconName; onPress: () => void; testID: string; bg: string; fg: string; border: string }) {
   return (

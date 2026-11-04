@@ -1,4 +1,4 @@
-# Presence ("Sala d'Attesa") API + BiLume rename on /api/join
+# Presence ("Sala d'Attesa") API + IriDuo rename on /api/join
 import os
 import random
 import pytest
@@ -60,7 +60,7 @@ class TestPresence:
 
 
 class TestRename:
-    def test_join_title_bilume(self, s):
+    def test_join_title_iriduo(self, s):
         r = s.get(f"{BASE_URL}/api/join", params={"code": "123456"})
         assert r.status_code == 200
-        assert "<title>BiLume · codice 123456</title>" in r.text
+        assert "<title>IriDuo · codice 123456</title>" in r.text
