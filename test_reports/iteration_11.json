@@ -1,0 +1,28 @@
+{
+  "summary": "Frontend-only retest of the Inviti Multipli fixes, run in 2 multi-context async_playwright sessions with fake media (375x667). Each session had 3-4 isolated pages: viewers A, B, C and the sender. 34 of 37 checks passed, but 2 of the 3 failures are the same bug: chat B->S failed in both runs and reaction B->S in the second. The third failure is that bug's reaction symptom. CRITICAL fix verified: while live, inviting offline code 111111 shows 'Visore 111111: codice non trovato (il visore deve essere aperto).' The guest row is removed, A stays connected, sender-live-badge stays visible and the status still reads 'Collegato'. HIGH fix verified: re-adding B while B is watching shows 'Visore <B>: è già nella chiamata.' B's row stays at 'Sta guardando' and the counter stays at (1/3). Adding the primary code shows the same message and adds no row. NEW promotion verified: when A hangs up, the broadcast continues to B (B video readyState 4, 3840 wide, playing). Sender status and media status both read 'Il visore principale ha chiuso: continui a trasmettere a <B>.' B's row is removed (0/3), the sender stays live, sender chat and reactions reach B, and sender hangup ends B. A second promotion also works (guest C added after the first promotion, B hangs up, C promoted), and the last viewer hanging up ends the call. Regression passed: decline, single call, chat both ways, reactions both ways, guest chat before promotion, and remove guest (B back to waiting, A stays live). NEW BUG: after promotion, chat and reactions FROM the promoted viewer to the sender are silently dropped. No deprecated Expo packages were found in the reviewed files.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Primary viewer hangs up and a guest is promoted, then the promoted viewer sends chat or reactions to the sender", "issue": "Chat (TEST_B2S_post) and reactions (clap) sent by promoted viewer B never reach the sender. Sender->B chat and reactions still work. Before promotion, chat from guest B to the sender works.", "affected_testIDs": ["viewer-chat-composer-send-button", "viewer-reactions-clap", "sender-chat", "sender-floating-reactions"]}
+    ],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": ["inline browser_automation scripts (multi-context async_playwright with fake media)"],
+  "action_items": [
+    "HIGH: stage.html sorvegliaPrimaria / addGuest. After promotion, o.dc's original data handler (line ~593: `if (!d || ospiti[code] !== o) return;`) ignores everything because the code was deleted from ospiti. The new handler (line ~626) only handles 'decline'. Fix: change the guard to `if (!d || (ospiti[code] !== o && chiamataS !== o.call)) return;`. Alternatively, have the promoted canaleS handler also forward d.t==='chat' (send({type:'chat'...})) and d.t==='react' (reazioneRicevuta).",
+    "LOW: after promotion, nothing watches the promoted call's peerConnection 'failed' state: the guest listener returns because ospiti[code] !== o, and the primary 'failed' listener is attached only to the original pc. If the promoted viewer's network fails without a 'close' event, the sender may stay 'live'. Add a connectionstatechange 'failed' -> fineS() listener when promoting."
+  ],
+  "critical_code_review_comments": [
+    "stage.html:523-524. While live with no guests, non-'peer-unavailable' peer errors still call fineS(), so transient peer errors such as 'network' end a single call. This behaviour predates this change; check that it is intended.",
+    "Promotion reads the guest code from the PeerJS error message with a regex (\\d{6}). This works, but it depends on PeerJS message wording."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A", "frontend": "92% (34/37 checks; the 3 failures come from 1 bug)"},
+  "seed_data_creation": "None. Chat test messages prefixed TEST_; no persisted data created.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Use async_playwright with --use-fake-device-for-media-stream --use-fake-ui-for-media-stream and one new_context per page. Use add_init_script localStorage onboarded=true and go directly to /viewer and /sender. viewer-answer-button and viewer-decline-button pulse (never 'stable'), so click them with force=True. Click sender buttons WITHOUT force after scrollIntoView. Read the viewer code from viewer-code (strip non-digits). Chat inputs: <prefix>-chat-composer-input / -send-button. Count sender reactions with '[data-testid=sender-floating-reactions] > *' within 500ms. Count viewer reactions with the iframe global attive.length. Iframe global 'video' gives the remote video state.",
+  "rca_of_issue": "Promoted viewer's chat and reactions are dropped. Repro: S calls A, A answers. Add B, B answers. A hangs up (promotion). B sends chat or a reaction, and the sender gets nothing. Cause: addGuest's dc.on('data') guard requires ospiti[code] === o, but sorvegliaPrimaria deletes ospiti[code] when promoting. The replacement handler added during promotion only processes 'decline'. Mitigation: relax the guard to also accept chiamataS === o.call, or forward chat/react in the promoted handler."
+}

@@ -10,9 +10,10 @@ type Props = {
   onEvent: (e: StageEvent) => void;
   ref?: Ref<StageHandle>;
   testID: string;
+  query?: string;
 };
 
-export function StageView({ mode, onEvent, ref, testID }: Props) {
+export function StageView({ mode, onEvent, ref, testID, query }: Props) {
   const wv = useRef<WebView>(null);
   const handler = useRef(onEvent);
   handler.current = onEvent;
@@ -26,7 +27,7 @@ export function StageView({ mode, onEvent, ref, testID }: Props) {
     <View style={styles.wrap} testID={testID}>
       <WebView
         ref={wv}
-        source={{ uri: stageUrl(mode) }}
+        source={{ uri: stageUrl(mode, query) }}
         originWhitelist={[stageOrigin()]}
         onShouldStartLoadWithRequest={(r) => r.url.startsWith(`${stageOrigin()}/`) || r.url.startsWith("blob:") || r.url === "about:blank"}
         javaScriptEnabled

@@ -9,9 +9,10 @@ type Props = {
   onEvent: (e: StageEvent) => void;
   ref?: Ref<StageHandle>;
   testID: string;
+  query?: string;
 };
 
-export function StageView({ mode, onEvent, ref, testID }: Props) {
+export function StageView({ mode, onEvent, ref, testID, query }: Props) {
   const frame = useRef<HTMLIFrameElement | null>(null);
   const handler = useRef(onEvent);
   handler.current = onEvent;
@@ -41,7 +42,7 @@ export function StageView({ mode, onEvent, ref, testID }: Props) {
       {createElement("iframe", {
         key,
         ref: frame,
-        src: stageUrl(mode),
+        src: stageUrl(mode, query),
         title: "Scena VR180",
         allow: "camera; microphone; autoplay; fullscreen",
         style: { border: 0, width: "100%", height: "100%", background: colors.stage, display: "block" },

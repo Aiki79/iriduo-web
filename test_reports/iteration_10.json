@@ -1,0 +1,34 @@
+{
+  "summary": "Frontend-only E2E test of Inviti Multipli, Codice Fisso, Galleria and regression, using 3-6 isolated Chromium contexts with fake media (375x667). Codice Fisso, Galleria and every regression flow pass. Inviti Multipli core flows pass: add guest -> 'Squilla…' -> 'Sta guardando', 3D video on the guest stage (3840 wide, readyState 4), chat and reactions from the sender reach A and B, chat and reactions from B reach the sender, remove sends B back to waiting while A stays live, decline shows 'Visore X: ha rifiutato.', primary code shows 'è già nella chiamata', max 3 (input hidden at 3/3), sender hangup ends A and all guests. Found 2 bugs: (1) CRITICAL: inviting an offline or wrong guest code ends the whole broadcast. (2) Re-adding a guest who is already in the call shows the right message but removes that guest's row, leaving an orphaned viewer the sender cannot see or remove. No deprecated Expo packages detected.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "stage.html peerS error handler (Inviti Multipli)", "issue": "Inviting a guest code that is not online (e.g. 999999, typo, or the viewer closed the app) makes PeerJS emit 'peer-unavailable' on peerS. The shared handler at /app/backend/stage.html:518-523 then calls fineS(), which ends the primary call AND all guests. Sender status becomes 'Codice non trovato…' and A drops. Reproduced 2/2.", "testID": "sender-guest-add-button", "priority": "CRITICAL"},
+      {"component": "GuestsPanel / sender.tsx duplicate guest", "issue": "Adding the code of a guest who is already connected: onAdd (sender.tsx:416-417) overwrites guests[code]='adding'. The stage then replies 'duplicate', and the guest handler (sender.tsx:303-309) deletes guests[code]. Result: the message 'è già nella chiamata' appears, but the connected guest's row disappears. B keeps watching but the sender can no longer see or remove B, and the counter shows a free slot. Reproduced 1/1.", "testID": "sender-guest-<code>", "priority": "HIGH"}
+    ],
+    "integration_issues": [
+      {"flow": "Primary viewer hangs up while guests watch", "issue": "When primary A hangs up, the sender call ends for everyone (guest B is kicked). This may be by design, but users will likely expect the broadcast to continue for the guests. Product decision needed.", "affected_testIDs": ["viewer-hangup-button", "sender-guests"]},
+      {"flow": "Chat between guests", "issue": "INFO: B's chat reaches the sender only, not A (no relay between viewers). Fine if intended.", "affected_testIDs": ["viewer-chat-composer-send-button"]}
+    ],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": ["inline browser_automation scripts (multi-context async_playwright with fake media)"],
+  "action_items": [
+    "CRITICAL stage.html:518: in the peerS 'error' handler, when e.type==='peer-unavailable', get the peer id from e.message ('Could not connect to peer vr180-XXXXXX'). If it matches a guest in ospiti (not codicePrimario), call togliOspite(code,'notfound') and return without fineS(). Add GUEST_MSG.notfound='codice non trovato' in sender.tsx. Only end the call when the error is for the primary peer or before going live.",
+    "HIGH sender.tsx:416: do not overwrite existing entries: setGuests(g => g[c] ? g : {...g,[c]:'adding'}). In the 'guest' event handler, do not delete next[e.code] when e.state==='duplicate' (or block the add in GuestsPanel when guests[code] exists or the code equals the primary).",
+    "Decide whether the broadcast should continue for guests when the primary viewer hangs up (currently it ends for all)."
+  ],
+  "critical_code_review_comments": [
+    "sender.tsx: the GUEST_MSG const is declared between import statements (line 22, before the theme import on line 32). It works but should move below the imports.",
+    "The 'full' guard relies on UI hiding the input. Stage enforcement (MAX_OSPITI) exists too, so that is OK.",
+    "sender.tsx is 616 lines, close to the 700-line limit. Consider extracting the onEvent reducer."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A", "frontend": "~93% (2 failing checks out of ~45)"},
+  "seed_data_creation": "None. Only ephemeral PeerJS codes and TEST_ chat messages (not persisted).",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Use async_playwright in browser_automation with --use-fake-device-for-media-stream --use-fake-ui-for-media-stream, one new_context per viewer/sender, add_init_script localStorage onboarded=true. Click the sender guest add, remove, chat and reaction buttons WITHOUT force, after el.scrollIntoView({block:'center'}): a force click can land on the fixed bottom sender-hangup-button and end the call (test artifact). The stage iframe has globals 'video' (remote video element, not in the DOM) and 'attive' (active 3D reactions) for frame.evaluate checks. Screenshots must be .jpg when quality is passed.",
+  "rca_of_issue": "Offline guest kills the call: guest invites reuse peerS (peerS.call/peerS.connect). PeerJS reports unreachable targets as an error event on the Peer object, not on the MediaConnection. The single peerS.on('error') handler was written for the primary call and always calls fineS(). Repro: live call with A, add guest code 999999, and within about 2s the sender status shows 'Codice non trovato…' and A drops. Duplicate guest row: optimistic UI state 'adding' overwrites the real 'connected' state, then the 'duplicate' response deletes the key."
+}

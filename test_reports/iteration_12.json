@@ -1,0 +1,22 @@
+{
+  "summary": "Retested the fix for the promoted viewer's chat and reactions (stage.html:593 guard now accepts chiamataS === o.call; a failed-connection listener was added for the promoted call). The test used 3 browser contexts with fake media: viewer A, viewer B and the sender. All 12 checks passed: single-call chat both ways, guest chat and reaction before takeover, promotion of B after A hangs up, chat and heart reaction from promoted B reaching the sender, sender-to-B chat, and sender hangup ending B. No regressions found.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": ["inline browser_automation script (multi-context async_playwright with fake media)"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "stage.html:593 guard (ospiti[code] !== o && chiamataS !== o.call) is correct. After promotion, the promoted dc has 2 data handlers: the addGuest one (chat/react/decline) and the promotion one (decline -> fineS). A decline after promotion runs togliOspite, which does nothing because the entry was deleted, and then fineS. This is harmless."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A", "frontend": "100% (12/12 checks)"},
+  "seed_data_creation": "None. Chat messages prefixed TEST_ are ephemeral (P2P only).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Same approach as iteration 11: async_playwright inside browser_automation, launched with --use-fake-device-for-media-stream and --use-fake-ui-for-media-stream, with one new_context per page and an init script setting localStorage onboarded=true. Screenshots with quality need .jpg paths. Promotion status text on sender-status: 'Il visore principale ha chiuso: continui a trasmettere a <code>.'",
+  "rca_of_issue": "Iteration 11 bug (promoted viewer chat/reactions dropped) is fixed and verified."
+}

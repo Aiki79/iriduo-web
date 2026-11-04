@@ -17,7 +17,20 @@ import { Btn, Chip, ChipRow, Header, Label, StatusBox, Toggle } from "@/src/comp
 import { addRecentCode, getRecentCodes } from "@/src/recent";
 import { getContacts, nameFor, type Contact } from "@/src/contacts";
 import { ChunkReceiver } from "@/src/media";
+import { GuestsPanel } from "@/src/components/GuestsPanel";
 import { colors, fonts, radius, spacing } from "@/src/theme";
+
+const GUEST_MSG: Record<string, string> = {
+  declined: "ha rifiutato",
+  noanswer: "nessuna risposta",
+  failed: "collegamento non riuscito",
+  invalid: "il codice deve avere 6 cifre",
+  duplicate: "è già nella chiamata",
+  full: "massimo 3 visori aggiunti",
+  notLive: "avvia prima la chiamata",
+  ended: "ha chiuso",
+  notfound: "codice non trovato (il visore deve essere aperto)",
+};
 
 const isWeb = Platform.OS === "web";
 const RESOLUTIONS = [
@@ -120,6 +133,10 @@ function SenderBody() {
   const goodRef = useRef(0);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [guests, setGuests] = useState<Record<string, string>>({});
+  useEffect(() => {
+    if (phase === "idle") setGuests({});
+  }, [phase]);
   const [recAt, setRecAt] = useState<number | null>(null);
   const [recNow, setRecNow] = useState(Date.now());
   const [mediaMsg, setMediaMsg] = useState<{ text: string; tone: "info" | "success" | "error" } | null>(null);
@@ -284,6 +301,24 @@ function SenderBody() {
             setMediaMsg(ok ? { text: `Registrazione pronta: ${e.name}`, tone: "success" } : { text: "Non sono riuscito a salvare la registrazione.", tone: "error" }),
           );
           break;
+        case "guest":
+          setGuests((g) => {
+            if (e.state === "duplicate" || e.state === "full" || e.state === "notLive" || e.state === "invalid") {
+              if (g[e.code] !== "adding") return g;
+            }
+            const next = { ...g };
+            if (["ringing", "connected"].includes(e.state)) next[e.code] = e.state;
+            else delete next[e.code];
+            return next;
+          });
+          if (e.state === "promoted") {
+            setMediaMsg({ text: `Il visore principale ha chiuso: continui a trasmettere a ${e.code}.`, tone: "info" });
+            break;
+          }
+          if (!["ringing", "connected", "removed"].includes(e.state)) {
+            setMediaMsg({ text: `Visore ${e.code}: ${GUEST_MSG[e.state] ?? "chiamata terminata"}.`, tone: e.state === "ended" ? "info" : "error" });
+          }
+          break;
         case "react":
           addFloater(e.kind);
           if (Platform.OS !== "web" && Date.now() - lastBuzzRef.current > 600) {
@@ -382,6 +417,22 @@ function SenderBody() {
               text={`Qualità automatica: invio ridotto a ${effBitrate / 1e6} Mbit/s per la connessione debole. Risalirà da sola quando migliora.`}
             />
           </View>
+        ) : null}
+        {phase === "live" ? (
+          <GuestsPanel
+            guests={guests}
+            onAdd={(c) => {
+              if (guests[c]) {
+                setMediaMsg({ text: `Visore ${c}: è già nella chiamata.`, tone: "error" });
+                return;
+              }
+              setGuests((g) => ({ ...g, [c]: "adding" }));
+              addRecentCode(c).then(setRecent);
+              stage.current?.send({ type: "addGuest", code: c });
+            }}
+            onRemove={(c) => stage.current?.send({ type: "removeGuest", code: c })}
+            names={contacts}
+          />
         ) : null}
         {phase === "live" ? (
           <View style={styles.statsWrap}>

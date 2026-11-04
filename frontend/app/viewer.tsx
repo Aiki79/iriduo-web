@@ -5,6 +5,8 @@ import * as ScreenOrientation from "expo-screen-orientation";
 import { DeviceMotion } from "expo-sensors";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useLocalSearchParams } from "expo-router";
+import { storage } from "@/src/utils/storage";
 import { Linking, Platform, StyleSheet, Text, View } from "react-native";
 import { KeyboardAwareScrollView, KeyboardStickyView } from "react-native-keyboard-controller";
 import Animated, { FadeIn, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from "react-native-reanimated";
@@ -13,7 +15,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StageView } from "@/src/components/StageView";
 import { ChatComposer, ChatPanel, ChatToasts, newMessage, type ChatMessage } from "@/src/components/CallChat";
 import { ReactionBar } from "@/src/components/Reactions";
-import { ChunkReceiver, saveAndShare } from "@/src/media";
+import { ChunkReceiver, readMemoryBase64, saveAndShare } from "@/src/media";
 import { CallPill, CallStatsCard, formatDuration, quality, type CallStatsData } from "@/src/components/CallStats";
 import { addCall, topQuality } from "@/src/history";
 import { ShareCode } from "@/src/components/ShareCode";
@@ -45,6 +47,24 @@ function PulsingAnswer({ onPress }: { onPress: () => void }) {
 export default function Viewer() {
   const insets = useSafeAreaInsets();
   const stage = useRef<StageHandle>(null);
+  const { photo } = useLocalSearchParams<{ photo?: string }>();
+  const [fixedOn, setFixedOn] = useState<boolean | null>(null);
+  const [initQuery, setInitQuery] = useState<string | undefined>(undefined);
+  const fixedOnRef = useRef(false);
+  useEffect(() => {
+    Promise.all([storage.getItem("fixed_code_on", false), storage.getItem("fixed_code", "")]).then(([on, saved]) => {
+      const enabled = !!on;
+      fixedOnRef.current = enabled;
+      if (enabled && /^\d{6}$/.test(String(saved))) setInitQuery(`fixed=${saved}`);
+      setFixedOn(enabled);
+    });
+  }, []);
+  const toggleFixed = (v: boolean) => {
+    fixedOnRef.current = v;
+    setFixedOn(v);
+    storage.setItem("fixed_code_on", v);
+    if (v && codeRef.current) storage.setItem("fixed_code", codeRef.current);
+  };
   const [code, setCode] = useState<string | null>(null);
   const [status, setStatus] = useState("Collegamento al server…");
   const [phase, setPhase] = useState<Phase>("connecting");
@@ -97,11 +117,25 @@ export default function Viewer() {
           send({ type: "setSwap", on: swap });
           send({ type: "setView", value: view });
           send({ type: "setMotion", on: motion });
+          if (photo && !isWeb) {
+            readMemoryBase64(photo)
+              .then((data) => {
+                const f = /_TB\./.test(photo) ? "tb" : "sbs";
+                send({ type: "setFormat", value: f });
+                setFormat(f);
+                send({ type: "showImage", data, name: photo });
+              })
+              .catch(() => setMediaMsg({ text: "Non riesco ad aprire la foto.", tone: "error" }));
+          }
           break;
         case "code":
           setCode(e.code);
           codeRef.current = e.code;
           setPhase("waiting");
+          if (fixedOnRef.current) storage.setItem("fixed_code", e.code);
+          break;
+        case "codeTaken":
+          setMediaMsg({ text: "Il tuo codice fisso era occupato: ne ho creato uno nuovo e l’ho memorizzato.", tone: "info" });
           break;
         case "status":
           setStatus(e.text);
@@ -314,7 +348,7 @@ export default function Viewer() {
         style={full ? styles.stageFull : [styles.stageBox, { aspectRatio: view === "split" ? 2 : 16 / 9 }]}
         testID="viewer-stage-container"
       >
-        <StageView ref={stage} mode="viewer" onEvent={onEvent} testID="viewer-stage" />
+        {fixedOn === null ? <View style={styles.flex} /> : <StageView ref={stage} mode="viewer" onEvent={onEvent} testID="viewer-stage" query={initQuery} />}
         {phase === "connected" && !composerOpen ? (
           <ChatToasts messages={messages} split={full && view === "split"} bottom={full ? Math.max(insets.bottom, spacing.md) + 64 : undefined} testID="viewer-chat-toasts" />
         ) : null}
@@ -423,6 +457,13 @@ export default function Viewer() {
           ) : null}
           {phase === "connected" ? <ChatPanel messages={messages} onSend={sendChat} testID="viewer-chat" /> : null}
 
+          <Toggle
+            testID="viewer-fixed-code-toggle"
+            label="Tieni sempre questo codice"
+            hint="Così i tuoi contatti non devono aggiornarlo. Il codice cambia solo se tocchi Nuovo codice."
+            value={!!fixedOn}
+            onChange={toggleFixed}
+          />
           <Label>Come guardare</Label>
           <ChipRow testID="viewer-view-chips">
             <Chip testID="viewer-view-drag-chip" icon="move" label="Con il dito" selected={view === "drag"} onPress={() => chooseView("drag")} />

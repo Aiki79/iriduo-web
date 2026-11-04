@@ -89,6 +89,11 @@ export default function Home() {
             <Text style={styles.historyText}>Rubrica</Text>
             <Feather name="chevron-right" size={22} color={colors.muted} />
           </Pressable>
+          <Pressable testID="home-gallery-button" onPress={() => router.push("/gallery")} style={({ pressed }) => [styles.historyBtn, styles.mtSm, pressed && styles.cardPressed]}>
+            <Feather name="image" size={22} color={colors.brandPrimary} />
+            <Text style={styles.historyText}>Ricordi 3D</Text>
+            <Feather name="chevron-right" size={22} color={colors.muted} />
+          </Pressable>
           <Pressable testID="home-intro-button" onPress={() => router.push("/welcome")} style={({ pressed }) => [styles.historyBtn, styles.mtSm, pressed && styles.cardPressed]}>
             <Feather name="help-circle" size={22} color={colors.brandPrimary} />
             <Text style={styles.historyText}>Come funziona</Text>

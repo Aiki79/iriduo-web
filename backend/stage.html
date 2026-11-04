@@ -30,6 +30,7 @@
 <script src="lib/peerjs.min.js"></script>
 <script>
 const PREFISSO = 'vr180chiamata-';
+let codiceFisso = (new URLSearchParams(location.search).get('fixed') || '').match(/^\d{6}$/) ? new URLSearchParams(location.search).get('fixed') : null;
 const MODE = new URLSearchParams(location.search).get('mode') || 'viewer';
 const $ = id => document.getElementById(id);
 
@@ -245,7 +246,7 @@ function costruisciSfere(){
 function ridimensiona(){ renderer.setSize(canvas.clientWidth, canvas.clientHeight, false); }
 
 function disegna(){
-  if (demo) disegnaDemo(performance.now() / 1000);
+  if (demo && demo !== 'foto') disegnaDemo(performance.now() / 1000);
   animaReazioni();
   const w = canvas.clientWidth, h = canvas.clientHeight;
   if (moto && haDati) camera.quaternion.copy(qOff).multiply(qDev);
@@ -297,7 +298,24 @@ handlers.orient = c => {
 };
 handlers.setMotion = c => { moto = !!c.on; haOff = false; haDati = false; };
 handlers.recenter = () => { haOff = false; yaw = 0; pitch = 0; };
-handlers.setFormat = c => { formato = c.value === 'tb' ? 'tb' : 'sbs'; if (demo) preparaDemo(); costruisciSfere(); };
+handlers.setFormat = c => { formato = c.value === 'tb' ? 'tb' : 'sbs'; if (demo && demo !== 'foto') preparaDemo(); costruisciSfere(); };
+handlers.showImage = c => {
+  if (chiamataV) { stato('Chiudi prima la chiamata per guardare una foto.'); return; }
+  const img = new Image();
+  img.onload = () => {
+    video.pause(); video.srcObject = null; video.removeAttribute('src'); video.load();
+    if (!demoCanvas) demoCanvas = document.createElement('canvas');
+    demoCanvas.width = img.naturalWidth; demoCanvas.height = img.naturalHeight;
+    demoCanvas.getContext('2d').drawImage(img, 0, 0);
+    if (demoTex) demoTex.dispose();
+    demoTex = new THREE.CanvasTexture(demoCanvas); demoTex.colorSpace = THREE.SRGBColorSpace;
+    demo = 'foto'; costruisciSfere(); mostraMedia(true); hint(null);
+    stato('Foto 3D: ' + String(c.name || '') + '. Guardati intorno.');
+    send({ type:'test', name: 'foto' });
+  };
+  img.onerror = () => stato('Non riesco ad aprire la foto.');
+  img.src = 'data:image/jpeg;base64,' + String(c.data || '');
+};
 handlers.setSwap = c => { scambia = !!c.on; costruisciSfere(); };
 handlers.setView = c => { vista = c.value === 'split' ? 'split' : 'drag'; };
 handlers.showFile = c => { $('file').hidden = !c.on; $('hint').style.visibility = c.on ? 'hidden' : ''; };
@@ -305,11 +323,11 @@ handlers.restart = () => location.reload();
 
 function avviaPeerVisore(){
   const rnd32 = new Uint32Array(1); crypto.getRandomValues(rnd32);
-  const codice = String(100000 + (rnd32[0] % 900000));
+  const codice = codiceFisso || String(100000 + (rnd32[0] % 900000));
   peerV = new Peer(PREFISSO + codice);
   peerV.on('open', () => { send({ type:'code', code: codice }); stato(msgDopoCodice || 'In attesa di chiamata.'); msgDopoCodice = null; });
   peerV.on('error', e => {
-    if (e.type === 'unavailable-id') { peerV.destroy(); avviaPeerVisore(); }
+    if (e.type === 'unavailable-id') { if (codiceFisso) { codiceFisso = null; send({ type:'codeTaken' }); } peerV.destroy(); avviaPeerVisore(); }
     else if (e.type !== 'peer-unavailable') { send({ type:'error', text:'Errore di collegamento (' + e.type + ').' }); }
   });
   const questoPeer = peerV;
@@ -347,6 +365,7 @@ function avviaPeerVisore(){
 let chiamateRecenti = [], msgDopoCodice = null;
 function rigeneraCodice(){
   if (chiamataV) return;
+  codiceFisso = null;
   if (attesa) { attesa.close(); attesa = null; }
   const vecchio = peerV; peerV = null;
   if (vecchio) vecchio.destroy();
@@ -471,7 +490,7 @@ async function avviaAnteprima(){
 
 handlers.config = c => {
   Object.assign(cfg, c.cfg || {});
-  if (chiamataS) { impostaBitrate(chiamataS.peerConnection, Number(cfg.bitrate)); return; }
+  if (chiamataS) { impostaBitrate(chiamataS.peerConnection, Number(cfg.bitrate)); for (const o of Object.values(ospiti)) impostaBitrate(o.call.peerConnection, Number(cfg.bitrate)); return; }
   if (cfg.cam !== attivo.cam || cfg.mic !== attivo.mic || cfg.res !== attivo.res) avviaAnteprima();
 };
 
@@ -488,6 +507,7 @@ function impostaBitrate(pc, bps){
 
 handlers.call = async c => {
   const codice = String(c.code || '').trim();
+  codicePrimario = codice;
   if (!/^\d{6}$/.test(codice)) { stato('Il codice deve avere 6 cifre.'); send({ type:'ended' }); return; }
   if (!streamLocale) { stato('Avvia prima la camera.'); send({ type:'ended' }); return; }
   send({ type:'calling' });
@@ -496,6 +516,12 @@ handlers.call = async c => {
     if (!peerS || peerS.destroyed) {
       peerS = new Peer();
       peerS.on('error', e => {
+        if (e.type === 'peer-unavailable') {
+          const m = String(e.message || '').match(/(\d{6})/);
+          const codeErr = m && m[1];
+          if (codeErr && ospiti[codeErr]) { togliOspite(codeErr, 'notfound'); return; }
+          if (chiamataS && codeErr && codeErr !== codicePrimario) return;
+        } else if (chiamataS && chiamataS.open && Object.keys(ospiti).length) { stato('Errore di collegamento (' + e.type + ').'); return; }
         stato(e.type === 'peer-unavailable'
           ? 'Codice non trovato: controlla che il visore mostri lo stesso codice.'
           : 'Errore di collegamento (' + e.type + ').');
@@ -535,15 +561,87 @@ handlers.call = async c => {
     if (pc.connectionState === 'failed') { stato('Collegamento non riuscito: la rete potrebbe bloccare la connessione diretta.'); fineS(); }
   });
   chiamataS.on('stream', r => { $('audioRemoto').srcObject = r; $('audioRemoto').play().catch(() => {}); });
-  const questa = chiamataS;
-  chiamataS.on('close', () => { if (chiamataS === questa) { fineS(); stato('Chiamata terminata.'); } });
+  sorvegliaPrimaria(chiamataS);
 };
+
+
+/* ---------- inviti multipli: altri visori che guardano la stessa trasmissione ---------- */
+const ospiti = {}; let codicePrimario = null;
+const MAX_OSPITI = 3;
+function statoOspite(code, state){ send({ type:'guest', code, state }); }
+function togliOspite(code, state){
+  const o = ospiti[code]; if (!o) return;
+  delete ospiti[code];
+  clearTimeout(o.timer);
+  if (state === 'removed' && o.dc && o.dc.open && o.state !== 'connected') { try { o.dc.send({ t:'cancel' }); } catch {} }
+  try { o.call.close(); } catch {}
+  if (o.dc) setTimeout(() => { try { o.dc.close(); } catch {} }, 300);
+  statoOspite(code, state);
+}
+handlers.addGuest = c => {
+  const code = String(c.code || '').trim();
+  if (!/^\d{6}$/.test(code)) { statoOspite(code, 'invalid'); return; }
+  if (!chiamataS || !peerS || !streamLocale) { statoOspite(code, 'notLive'); return; }
+  if (code === codicePrimario || ospiti[code]) { statoOspite(code, 'duplicate'); return; }
+  if (Object.keys(ospiti).length >= MAX_OSPITI) { statoOspite(code, 'full'); return; }
+  const call = peerS.call(PREFISSO + code, streamLocale);
+  const dc = peerS.connect(PREFISSO + code);
+  const o = { call, dc, state: 'ringing' };
+  ospiti[code] = o;
+  statoOspite(code, 'ringing');
+  dc.on('data', d => {
+    if (!d || (ospiti[code] !== o && chiamataS !== o.call)) return;
+    if (d.t === 'decline') togliOspite(code, 'declined');
+    if (d.t === 'chat') send({ type:'chat', text: String(d.text || '').slice(0, 300) });
+    if (d.t === 'react') reazioneRicevuta(String(d.kind));
+  });
+  o.timer = setTimeout(() => { if (ospiti[code] === o && o.state === 'ringing') togliOspite(code, 'noanswer'); }, 45000);
+  const pc = call.peerConnection;
+  if (pc) pc.addEventListener('connectionstatechange', () => {
+    if (ospiti[code] !== o) return;
+    if (pc.connectionState === 'connected') { clearTimeout(o.timer); o.state = 'connected'; impostaBitrate(pc, Number(cfg.bitrate)); statoOspite(code, 'connected'); }
+    if (pc.connectionState === 'failed') togliOspite(code, 'failed');
+  });
+  call.on('close', () => { if (ospiti[code] === o) togliOspite(code, 'ended'); });
+};
+handlers.removeGuest = c => togliOspite(String(c.code || ''), 'removed');
+function canaliUscita(){
+  const out = [];
+  if (MODE === 'sender') { if (chiamataS && canaleS) out.push(canaleS); for (const o of Object.values(ospiti)) if (o.dc) out.push(o.dc); }
+  else if (chiamataV && canali[chiamataV.peer]) out.push(canali[chiamataV.peer]);
+  return out.filter(d => d.open);
+}
+
+function sorvegliaPrimaria(call){
+  call.on('close', () => {
+    if (chiamataS !== call) return;
+    const conn = Object.entries(ospiti).find(([, o]) => o.state === 'connected');
+    if (!conn) { fineS(); stato('Chiamata terminata.'); return; }
+    // il visore principale ha chiuso: un ospite diventa il principale e la trasmissione continua
+    const [code, o] = conn;
+    clearTimeout(o.timer); delete ospiti[code];
+    const vecchioDc = canaleS;
+    chiamataS = o.call; canaleS = o.dc; codicePrimario = code;
+    if (vecchioDc) setTimeout(() => { try { vecchioDc.close(); } catch {} }, 300);
+    canaleS.on('data', d => { if (d && d.t === 'decline' && chiamataS === o.call) { stato('Chiamata rifiutata dal visore.'); fineS(); } });
+    sorvegliaPrimaria(o.call);
+    const pcP = o.call.peerConnection;
+    if (pcP) pcP.addEventListener('connectionstatechange', () => {
+      if (chiamataS === o.call && pcP.connectionState === 'failed') { stato('Collegamento perso con il visore.'); fineS(); }
+    });
+    avviaStats(pcP, 'out');
+    statoOspite(code, 'promoted');
+    stato('Il visore principale ha chiuso: continui a trasmettere a ' + code + '.');
+  });
+}
 
 function annullaS(){
   if (canaleS && canaleS.open) { try { canaleS.send({ t:'cancel' }); } catch {} }
   fineS();
 }
 function fineS(){
+  for (const k of Object.keys(ospiti)) togliOspite(k, 'ended');
+  codicePrimario = null;
   fermaStats();
   fermaRec();
   clearTimeout(timerSquillo);
@@ -617,8 +715,7 @@ handlers.react = c => {
   const ora = performance.now();
   if (ora - ultimaReazione < 200) return;
   ultimaReazione = ora;
-  const dc = MODE === 'sender' ? (chiamataS ? canaleS : null) : (chiamataV ? canali[chiamataV.peer] : null);
-  if (dc && dc.open) { try { dc.send({ t:'react', kind }); } catch {} }
+  for (const dc of canaliUscita()) { try { dc.send({ t:'react', kind }); } catch {} }
   lanciaReazione(kind);
 };
 function reazioneRicevuta(kind){
@@ -687,8 +784,10 @@ async function salvaRegistrazione(){
 /* ---------- chat durante la chiamata ---------- */
 handlers.chat = c => {
   const text = String(c.text || '').slice(0, 300);
-  const dc = MODE === 'sender' ? (chiamataS ? canaleS : null) : (chiamataV ? canali[chiamataV.peer] : null);
-  if (text && dc && dc.open) { try { dc.send({ t:'chat', text }); send({ type:'chatSent', id: c.id }); return; } catch {} }
+  const dcs = canaliUscita();
+  let ok = false;
+  for (const dc of dcs) { try { dc.send({ t:'chat', text }); ok = true; } catch {} }
+  if (text && ok) { send({ type:'chatSent', id: c.id }); return; }
   send({ type:'chatError', id: c.id });
 };
 

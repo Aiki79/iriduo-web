@@ -25,9 +25,11 @@ export type StageEvent =
   | { type: "recStarted" }
   | { type: "recError"; text: string }
   | { type: "recSaved"; name: string; web?: boolean }
-  | { type: "recChunk"; i: number; n: number; data: string; name: string; mime: string };
+  | { type: "recChunk"; i: number; n: number; data: string; name: string; mime: string }
+  | { type: "codeTaken" }
+  | { type: "guest"; code: string; state: string };
 
 export type StageHandle = { send: (c: StageCmd) => void; reload: () => void };
 
-export const stageUrl = (mode: string) => `${process.env.EXPO_PUBLIC_BACKEND_URL}/api/stage?mode=${mode}`;
+export const stageUrl = (mode: string, query?: string) => `${process.env.EXPO_PUBLIC_BACKEND_URL}/api/stage?mode=${mode}${query ? `&${query}` : ""}`;
 export const stageOrigin = () => new URL(String(process.env.EXPO_PUBLIC_BACKEND_URL)).origin;

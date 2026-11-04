@@ -14,6 +14,10 @@
 - Native: expo-sensors DeviceMotion for looking around, expo-screen-orientation for landscape fullscreen, expo-camera permissions, recent codes stored locally
 
 ## Implemented (2026-06)
+- Memories gallery (/gallery, native only): photos and recordings saved in document/ricordi; view photos in 3D in the viewer (/viewer?photo=), share, delete with confirmation
+- Fixed code: viewer toggle; the code is reused through the ?fixed= stage param; falls back to a new code if taken (codeTaken); "Nuovo codice"/flood replace it
+- Multiple invites: the sender adds up to 3 more viewers (addGuest/removeGuest) once live; chat/reactions go to everyone, bitrate applies to each
+- RevenueCat Pro: still to do, the user's RevenueCat is not connected (oauth_pending)
 - Security: three.js/PeerJS served from /api/lib, CSP + frame-ancestors on the stage, postMessage limited to the app's own origin, codes from crypto.getRandomValues, more than 5 calls a minute -> new code, "Nuovo codice" button, /api/join allowlist (frontend:// or exp:// on Emergent hosts), CORS without credentials, WebView limited to its own origin with no file access
 - Contacts (/contacts): name + code, delete with confirmation, call; names in the sender and the history
 - 3D photo (SBS/TB JPEG of the video or demo) and recording (MediaRecorder, max 5 min, auto-save on hangup); native: base64 chunks -> expo-file-system -> share sheet; web: download
