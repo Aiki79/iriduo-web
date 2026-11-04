@@ -1,4 +1,4 @@
-"""User's original icon + line-art VR visor on the blue head and line-art eyes on the red head.
+"""User's original icon + line-art Meta Quest-style visor on the blue head and line-art eyes on the red head.
 Strokes are bold on the outer side and get thinner (and lighter) towards the centre,
 where the two heads cross: one person wears the visor, the other does not."""
 import sys
@@ -43,17 +43,17 @@ def make(src, dst, bx, cy, r, rx):
     X, Y, R, RX = bx * s, cy * s, r * s, rx * s
     T, t = R * 0.045, R * 0.012  # thick / thin stroke
 
-    # --- visor (blue head): outer frame, two lens outlines, strap stub
-    w, h = R * 1.0, R * 0.66
-    top = Y - h * 0.62
-    lw, lh = w * 0.72, h * 0.5
+    # --- visor (blue head): Meta Quest-like front plate with nose arch, no lenses
+    w, h = R * 1.0, R * 0.62
+    top = Y - h * 0.6
 
     def visor(d, sw):
         sw = max(1, int(sw))
-        d.rounded_rectangle((X - w, top, X + w, top + h), radius=int(h * 0.42), outline=255, width=sw)
-        for lx in (X - w * 0.84, X + w * 0.12):
-            d.rounded_rectangle((lx, top + (h - lh) / 2, lx + lw, top + (h + lh) / 2), radius=int(lh * 0.5), outline=255, width=sw)
-        d.line((X - R * 1.3, top + h * 0.5, X - w, top + h * 0.5), fill=255, width=sw)
+        d.rounded_rectangle((X - w, top, X + w, top + h), radius=int(h * 0.46), outline=255, width=sw)
+        nw, nh = w * 0.2, h * 0.26  # nose arch
+        d.rectangle((X - nw, top + h - sw * 2, X + nw, top + h + sw), fill=0)
+        d.arc((X - nw, top + h - nh, X + nw, top + h + nh), 180, 360, fill=255, width=sw)
+        d.line((X - R * 1.3, top + h * 0.42, X - w, top + h * 0.42), fill=255, width=sw)  # strap
 
     vw = ramp(S, X - w, X + w * 0.9, 255, 0)  # thick on the outer (left) side
     vmask = blend_widths(S, visor, T, t, vw)
