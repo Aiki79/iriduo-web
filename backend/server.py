@@ -1,4 +1,7 @@
 import asyncio
+import hashlib
+import time
+from collections import defaultdict, deque
 from contextlib import suppress
 from fastapi import FastAPI, APIRouter, HTTPException, Query, Request
 from fastapi.responses import FileResponse, HTMLResponse
@@ -6,13 +9,12 @@ import html
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
-from pymongo import ASCENDING, DESCENDING, IndexModel
+from pymongo import ASCENDING, IndexModel
+from pymongo.errors import DuplicateKeyError
 import os
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field
-from typing import List
-import uuid
 from datetime import datetime, timedelta, timezone
 import re
 
@@ -27,10 +29,6 @@ db = client[os.environ['DB_NAME']]
 
 # One entry per collection: every field a route filters, sorts or dedupes on. Add the index in the same edit as the query.
 INDEXES: dict[str, list[IndexModel]] = {
-    "status_checks": [
-        IndexModel([("id", ASCENDING)], name="id", unique=True),
-        IndexModel([("timestamp", DESCENDING)], name="timestamp_desc"),
-    ],
     "presence": [
         IndexModel([("code", ASCENDING)], name="code", unique=True),
         IndexModel([("updated_at", ASCENDING)], name="updated_at_ttl", expireAfterSeconds=120),
@@ -59,31 +57,9 @@ async def health():
 api_router = APIRouter(prefix="/api")
 
 
-# Define Models
-class StatusCheck(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    client_name: str
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
-class StatusCheckCreate(BaseModel):
-    client_name: str
-
-# Add your routes to the router instead of directly to app
 @api_router.get("/")
 async def root():
     return {"message": "Hello World"}
-
-@api_router.post("/status", response_model=StatusCheck)
-async def create_status_check(input: StatusCheckCreate):
-    status_dict = input.dict()
-    status_obj = StatusCheck(**status_dict)
-    _ = await db.status_checks.insert_one(status_obj.dict())
-    return status_obj
-
-@api_router.get("/status", response_model=List[StatusCheck])
-async def get_status_checks(limit: int = Query(20, ge=1, le=100)):
-    status_checks = await db.status_checks.find({}, {"_id": 0}).sort("timestamp", -1).limit(limit).to_list(limit)
-    return [StatusCheck(**status_check) for status_check in status_checks]
 
 STAGE_HTML = ROOT_DIR / "stage.html"
 
@@ -91,27 +67,68 @@ STAGE_HTML = ROOT_DIR / "stage.html"
 # ---------- presence: "in attesa" status for codes the caller already knows ----------
 class PresenceIn(BaseModel):
     code: str = Field(pattern=r"^\d{6}$")
+    token: str = Field(pattern=r"^[A-Za-z0-9-]{16,64}$")  # random per viewer session, proves ownership of the code
+
+
+PRESENCE_FRESH = timedelta(seconds=20)
+_hits: dict[str, deque] = defaultdict(deque)
+
+
+def rate_limit(request: Request, bucket: str, limit: int, per: float = 60.0) -> None:
+    """Small in-memory per-IP sliding window (single process)."""
+    # X-Forwarded-For = [client-forged..., real client, CDN, load balancer]: the two proxies append
+    # the last two hops, so the third from the end is the real client (forged entries come before it)
+    hops = [h.strip() for h in (request.headers.get("x-forwarded-for") or "").split(",") if h.strip()]
+    ip = hops[-3] if len(hops) >= 3 else (hops[0] if hops else (request.client.host if request.client else ""))
+    now = time.monotonic()
+    if len(_hits) > 10000:  # drop idle entries so memory stays bounded
+        for k in [k for k, v in _hits.items() if not v or now - v[-1] > per]:
+            del _hits[k]
+    q = _hits[f"{bucket}:{ip}"]
+    while q and now - q[0] > per:
+        q.popleft()
+    if len(q) >= limit:
+        raise HTTPException(status_code=429, detail="Troppe richieste, riprova tra poco")
+    q.append(now)
+
+
+def _token_hash(token: str) -> str:
+    return hashlib.sha256(token.encode()).hexdigest()
 
 
 @api_router.post("/presence")
-async def presence_ping(body: PresenceIn):
-    await db.presence.update_one({"code": body.code}, {"$set": {"code": body.code, "updated_at": datetime.now(timezone.utc)}}, upsert=True)
+async def presence_ping(body: PresenceIn, request: Request):
+    rate_limit(request, "presence_w", 40)
+    now = datetime.now(timezone.utc)
+    th = _token_hash(body.token)
+    # Only the owner may refresh a fresh entry; a stale one (owner gone) can be taken over
+    res = await db.presence.update_one(
+        {"code": body.code, "$or": [{"token": th}, {"updated_at": {"$lt": now - PRESENCE_FRESH}}]},
+        {"$set": {"token": th, "updated_at": now}},
+    )
+    if res.matched_count == 0:
+        try:
+            await db.presence.insert_one({"code": body.code, "token": th, "updated_at": now})
+        except DuplicateKeyError:
+            raise HTTPException(status_code=409, detail="Codice già in uso")
     return {"ok": True}
 
 
 @api_router.delete("/presence/{code}")
-async def presence_leave(code: str):
-    if re.fullmatch(r"\d{6}", code):
-        await db.presence.delete_one({"code": code})
+async def presence_leave(code: str, request: Request, token: str = Query("", max_length=64)):
+    rate_limit(request, "presence_w", 40)
+    if re.fullmatch(r"\d{6}", code) and token:
+        await db.presence.delete_one({"code": code, "token": _token_hash(token)})
     return {"ok": True}
 
 
 @api_router.get("/presence")
-async def presence_check(codes: str = Query("", max_length=200)):
+async def presence_check(request: Request, codes: str = Query("", max_length=200)):
+    rate_limit(request, "presence_r", 60)
     wanted = [c for c in codes.split(",") if re.fullmatch(r"\d{6}", c)][:20]
     if not wanted:
         return {"online": []}
-    since = datetime.now(timezone.utc) - timedelta(seconds=20)
+    since = datetime.now(timezone.utc) - PRESENCE_FRESH
     docs = await db.presence.find({"code": {"$in": wanted}, "updated_at": {"$gte": since}}, {"_id": 0, "code": 1}).to_list(20)
     return {"online": [d["code"] for d in docs]}
 

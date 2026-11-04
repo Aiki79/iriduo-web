@@ -1,0 +1,22 @@
+{
+  "summary": "Icon tweak verified by pixel analysis (/app/tests/check_icon_v2.py recreates the background from draw_icon_v2.py and diffs it). icon.png 1024x1024 RGB; figure alpha ends at row 815 (line is rows ~806-815); rows >=818 have zero figure pixels; the only difference from the pure background below the line is the intentional soft halo blur (max diff 26 at y=818, fading to 5 by y=838). Bodies are domes with no straight vertical segment. adaptive-icon.png 1024 RGBA: every pixel with alpha>8 sits within 312.6px of centre (0 px beyond 313), bbox x257-766, y365-695. Home screen (390x844, onboarded=true) shows home-logo (56x56, icon.png loaded, naturalWidth 1024) with 0 console errors.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "App icon (icon.png / adaptive-icon.png)", "issues": ["body() draws exactly the upper HALF of the ellipse (chord 180-360 with ellipse height 2h), so the floor cuts it at the equator where the tangent is vertical. The bottom ~50px look almost vertical: left body x goes 172->165 between y=750 and y=804. The user may still read this as 'vertical sides'. Optional fix: make the ellipse taller than 2h, or move its centre below the floor (e.g. top + 2.6*h with the floor still cutting it), so the shoulders meet the line at a slant."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/tests/check_icon_v2.py", "/app/.screenshots/home18.png"],
+  "action_items": ["Optional: if the user still sees vertical sides, cut the ellipse above its equator so the body edges meet the floor line at a slant (see design_issues)."],
+  "critical_code_review_comments": ["draw_icon_v2.py: the halo is applied to the whole figure, so a faint glow (<=26/255 diff) shows just below the floor line. This is by design, not body pixels."],
+  "updated_files": ["/app/tests/check_icon_v2.py (new test helper only)"],
+  "success_rate": {"backend": "N/A (skipped)", "frontend": "100%"},
+  "seed_data_creation": "none",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run python /app/tests/check_icon_v2.py (~60s) to recheck icon pixels. Floor line sits at 1024-px rows ~806-815. Adaptive art is 660px pasted at (182,170).",
+  "rca_of_issue": ""
+}

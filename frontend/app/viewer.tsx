@@ -85,12 +85,22 @@ export default function Viewer() {
     const sub = AppState.addEventListener("change", (s) => setAppActive(s === "active"));
     return () => sub.remove();
   }, []);
+  // Random secret proving to the server that this viewer owns the code. Saved on the device,
+  // so reopening the app right after it was killed doesn't lock the viewer out of its own code.
+  const presenceToken = useRef(`${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`);
+  useEffect(() => {
+    storage.getItem("presence_token", "").then((saved) => {
+      if (typeof saved === "string" && /^[A-Za-z0-9-]{16,64}$/.test(saved)) presenceToken.current = saved;
+      else storage.setItem("presence_token", presenceToken.current);
+    });
+  }, []);
   useEffect(() => {
     if (!code || phase !== "waiting" || !appActive) return;
     const base = `${process.env.EXPO_PUBLIC_BACKEND_URL}/api/presence`;
-    const leave = () => fetch(`${base}/${code}`, { method: "DELETE", keepalive: true }).catch(() => {});
+    const token = presenceToken.current;
+    const leave = () => fetch(`${base}/${code}?token=${token}`, { method: "DELETE", keepalive: true }).catch(() => {});
     const ping = () =>
-      fetch(base, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code }) }).catch(() => {});
+      fetch(base, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code, token }) }).catch(() => {});
     ping();
     const id = setInterval(ping, 8000);
     const vis = () => (document.visibilityState === "hidden" ? leave() : ping());

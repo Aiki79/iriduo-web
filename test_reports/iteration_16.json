@@ -1,0 +1,38 @@
+{
+  "summary": "Iteration 16: follow-up checks on the 3 low findings from iteration 15. (1) Rate limiter, tested through the external URL: the read bucket returned 429 at the 58th GET /api/presence. That is exactly 60 requests counting the 3 GETs from the earlier ownership test, even though every request sent a different forged X-Forwarded-For (single-entry and 3-entry chains). The 429 detail is 'Troppe richieste, riprova tra poco'. (2) Pruning of _hits (len>10000) was checked by code review only. (3) Presence ownership was re-checked through the external URL: a missing or short token gets 422; the owner's POST and refresh get 200; another token gets 409 'Codice già in uso'; DELETE with no token or the wrong token leaves the code online; the owner's DELETE takes it offline. Local suite (localhost:8001): 68/70 pass. The 2 failures are the known localhost-only same-host join tests. Frontend (375x667, 2 contexts, fake media, fixed code on): the viewer stores localStorage presence_token (31 chars, matches the pattern) and POSTs with it (200). After a reload within 20s, with DELETE requests set to be aborted, the token and code were unchanged and the POST returned 200 (no 409). The sender-waiting-{code} chip stayed visible. Regression: tapping the waiting chip rang the viewer; after Rispondi, the call connected (stats on both sides, 'Collegato'). After hangup the viewer POSTed presence again (200). No deprecated expo packages in the files reviewed.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "rate_limit() server.py:81-82", "issue": "hops[-3] hard-codes the preview proxy chain (client, Cloudflare, Google LB). If production has a different number of trusted proxies (no CDN, or an extra nginx hop), the key becomes forgeable again or puts every user in one proxy-IP bucket. Consider a TRUSTED_PROXY_HOPS env var. A request that reaches the LB directly, without Cloudflare, can still forge hops[-3]."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "sender presence poll (sender.tsx:150-154)", "issue": "On 429 the JSON has no 'online' field, so setOnline([]) runs and all 'In attesa' chips disappear until the next successful poll. With 60 reads/min per IP and a poll every 5s, more than 5 senders behind one NAT would see the chips flicker. Low priority: keep the previous state when !r.ok.", "affected_testIDs": ["sender-waiting-chips"]}
+    ],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_rate_limit_xff_external.py",
+    "/app/backend/tests/test_presence_ownership_external.py",
+    "/app/backend/tests/test_presence.py",
+    "/app/test_reports/pytest/pytest_results_iter16_xff.xml",
+    "/app/test_reports/pytest/pytest_results_iter16_local.xml"
+  ],
+  "action_items": [
+    "(Low) server.py:82 – make the trusted proxy hop count configurable via env, so the limiter keeps working if the production proxy chain differs from the preview chain.",
+    "(Low) sender.tsx:152 – ignore 429/non-OK presence responses instead of clearing the online list."
+  ],
+  "critical_code_review_comments": [
+    "viewer.tsx:90-96: presenceToken is replaced asynchronously from storage. If 'code' arrived before storage.getItem resolved, the first ping would use the fresh token. This is theoretical, because the PeerJS code always takes longer, and it was not observed.",
+    "_hits pruning is O(n) per request while the dict holds more than 10000 keys. That is acceptable now that keys can't be forged."
+  ],
+  "updated_files": ["/app/backend/tests/test_rate_limit_xff_external.py (new)", "/app/backend/tests/test_presence_ownership_external.py (new)"],
+  "success_rate": {"backend": "100% of requested checks (external XFF 429, external ownership); local suite 68/70, 2 failures env-specific", "frontend": "100% (token persisted and reused, no 409 on reload, chip stays online, call connects)"},
+  "seed_data_creation": "None. Presence entries use random codes and TEST- tokens and were deleted by token, or expire via the TTL.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Against the external URL, forged XFF no longer isolates buckets. All pod traffic (pytest and Playwright) shares one 60 reads/40 writes per minute budget, so run test_rate_limit_xff_external.py last and wait 60s afterwards. Run test_presence.py against http://localhost:8001. For Playwright fake media, launch a new browser with page.context.browser.browser_type.launch(args=[...fake media flags]). To keep the viewer code across reloads, seed localStorage fixed_code_on='true' and fixed_code=JSON.stringify('NNNNNN')."
+}

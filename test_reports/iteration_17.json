@@ -1,0 +1,21 @@
+{
+  "summary": "Icon asset redraw verified. icon.png 1024x1024 RGB full-bleed (corners (10,19,34)/(24,45,79) dark blue, not black); adaptive-icon.png 1024 RGBA transparent bg; splash-image.png 400 RGBA; favicon.png 48 RGB. /assets/assets/images/icon.png -> 200 image/png (162289 B); /favicon.ico -> 200, 48/32/16 ICO built from new favicon (dark-blue corners). Web preview (390x844, onboarded=true): home-title 'IriDuo' renders, home-logo 56x56 loads icon.png (natural 1024x1024, complete), 0 console/page errors. /pro and /history open and render with no errors.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Android adaptive icon", "issues": ["adaptive-icon.png: the content's outer ends (the floor-line tips at about x=234/790, y=711) sit about 341px from the centre, slightly beyond Android's 66/108 safe-zone radius (about 313px). Circular launcher masks may clip the tips of the floor line. Fix: shrink the artwork from 720 to about 660px, or centre it."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": [".screenshots/home.png", ".screenshots/pro.png", ".screenshots/history.png"],
+  "action_items": ["Optional: shrink the adaptive-icon artwork slightly (720 to about 660px) so the floor-line tips stay inside Android's circular safe zone."],
+  "critical_code_review_comments": ["draw_icon_v2.py pastes the adaptive artwork at (152,140), so it sits 12px above centre. This is intentional and harmless, but it pushes the bottom floor-line ends close to the safe-zone edge."],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped)", "frontend": "100%"},
+  "seed_data_creation": "none",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Assets come from /app/scripts/draw_icon_v2.py. Use add_init_script localStorage onboarded=true. Expo web serves the icon at /assets/?unstable_path=./assets/images/icon.png (and /assets/assets/images/icon.png)."
+}

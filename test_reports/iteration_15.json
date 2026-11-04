@@ -1,0 +1,32 @@
+{
+  "summary": "Iteration 15 – Security audit fixes (SEC-001/002/003). Backend: 70/70 pytest pass (test_presence.py rewritten to send tokens; new ownership, stale-takeover, rate-limit and /api/status tests). Verified: POST /api/presence requires token matching ^[A-Za-z0-9-]{16,64}$ (missing/empty/15/65 chars/invalid chars -> 422, 16 & 64 boundary -> 200); different token on fresh code -> 409 'Codice già in uso', owner can still refresh; after 21s stale a new token takes over (200) and the old token is then 409; DELETE with wrong/missing token -> {ok:true} but code stays online, correct token -> offline; GET unchanged; 41st write/min -> 429 (DELETE shares the write bucket), 61st GET/min -> 429, other IP unaffected; GET /api/status and POST /api/status -> 404. Frontend (375x667, two contexts, fake media): viewer POSTs {code, token} (30-char token, 200); sender seeded with recent code shows sender-waiting-{code} chip; closing viewer tab removes chip in ~5s; cross-origin hijack attempt from browser with other token -> 409 and foreign DELETE leaves it online; normal sender->viewer call connects (ring <1s, answer, stats on both sides); presence is [] during call and returns after viewer hangup, chip reappears on sender. No deprecated expo packages in reviewed files.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "rate_limit() server.py:79", "issue": "Bucket key is the FIRST X-Forwarded-For entry, which is client-controlled (ingress forwards it). Tests confirm a spoofed X-Forwarded-For gets a fresh bucket, so the 40/60 per-minute limits are trivially bypassable. Prefer the rightmost (ingress-appended) entry or X-Real-IP."},
+      {"endpoint": "_hits dict server.py:74", "issue": "Keys are never evicted (empty deques remain). Combined with spoofable XFF, an attacker can grow memory unbounded with unique IPs. Drop the key when the deque empties or cap the dict size."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_presence.py", "/app/test_reports/pytest/pytest_results_iter15.xml"],
+  "action_items": [
+    "(Low) server.py:79 – derive client IP from the rightmost/ingress-trusted X-Forwarded-For hop (or X-Real-IP) so rate limits cannot be bypassed by spoofing the header.",
+    "(Low) server.py:74-85 – evict empty/expired _hits keys to avoid unbounded memory growth.",
+    "(Low) viewer.tsx:95-96 – a 409 from POST /api/presence is silently ignored. On native, if the app is killed without a DELETE and reopened within 20s with 'Tieni sempre questo codice', the new session is invisible to senders for up to 20s. Acceptable, but consider persisting the token with the fixed code so the same device can reclaim it immediately."
+  ],
+  "critical_code_review_comments": [
+    "Ownership logic is correct: the update_one filter ($or token match OR stale) plus the unique index and DuplicateKeyError->409 handle races properly. Tokens are stored as sha256 hashes.",
+    "DELETE token Query max_length=64 but has no pattern. Harmless, because it is only hashed and compared."
+  ],
+  "updated_files": ["/app/backend/tests/test_presence.py"],
+  "success_rate": {"backend": "100% (70/70)", "frontend": "100% (presence chip, removal on tab close, hijack blocked, call connect, presence after hangup)"},
+  "seed_data_creation": "None. Test presence entries use random codes and TEST- prefixed tokens and are deleted by token in teardown (the rest expire via the 120s TTL).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Presence tests send a random X-Forwarded-For per test to avoid self-throttling (this works because the limiter trusts the first XFF entry). Storage seeding: storage JSON-encodes once, so use localStorage.setItem(k, JSON.stringify(v)), e.g. onboarded='true' and recent_codes='\"123456\"'. The viewer must tap viewer-answer-button. On the viewer, viewer-call-pill shows only in fullscreen, so use viewer-call-stats to detect a connected call. Run pytest with EXPO_PUBLIC_BACKEND_URL exported from frontend/.env."
+}

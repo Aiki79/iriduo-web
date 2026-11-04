@@ -60,3 +60,10 @@
 - Gratis: 3 chiamate/mese, solo HD, storico ultime 3, 3 reazioni, niente foto 3D/registrazioni. Pro: tutto sbloccato
 - Presenza: ping 8s, scadenza 20s, uscita su visibilitychange/pagehide; mittente controlla ogni 5s
 - Galleria: filtri Tutti/Foto/Video, anteprima foto a schermo intero
+
+## Jun 2026 - Security audit (PASS) + fixes
+- /api/status rimosso; presenza con token del visore (409 se codice in uso, DELETE solo col token)
+- Rate limit per IP (ultimo hop X-Forwarded-For): 40 scritture/min, 60 letture/min
+- Icona: ripristinata l'originale dell'utente
+
+- Icona: ridisegnata a 1024 dalla versione 192px dell'utente (due persone, visore a sinistra, 3D rosso/blu a destra) - scripts/draw_icon_v2.py
