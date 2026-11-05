@@ -72,3 +72,7 @@
 - Formato video 'Due cerchi fisheye affiancati (camera ELP)': stage.html uvFisheye (equidistante, sfere 128x64 per occhio, layer 1/2)
 - Cursori (FisheyePanel.tsx): centro X/Y ±150px, cerchio 70-130%, obiettivo 160-220° (187), occhio destro ±40px, Ripristina. Salvati solo in localStorage 'fisheye' dello stage, mai trasmessi
 - Foto in fisheye salvate con suffisso _FE
+
+## Jun 2026 - Guida calibrazione + Profili camera
+- Pulsante 'Guida calibrazione' (viewer-fisheye-guide-button): stage mostra il fotogramma piatto con cerchi pieni (raggio), tratteggio 180°, croce al centro, orizzonte (handlers.feGuide, canvas #guida)
+- Profili camera (src/profiles.ts, CameraProfiles.tsx): salva/applica/elimina calibrazioni per nome, solo sul dispositivo (chiave fisheye_profiles), max 20, stesso nome = sovrascrive

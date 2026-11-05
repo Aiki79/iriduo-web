@@ -17,11 +17,13 @@
   #file label{border:2px dashed #5CC8E0;border-radius:14px;padding:18px 22px;font-size:18px;font-weight:700;
     color:#5CC8E0;text-align:center;max-width:80%}
   #file input{display:none}
+  #guida{position:fixed;inset:0;width:100%;height:100%;display:block;background:#000;pointer-events:none}
 </style>
 </head>
 <body>
 <canvas id="stage"></canvas>
 <video id="anteprima" autoplay muted playsinline hidden></video>
+<canvas id="guida" hidden></canvas>
 <div id="hint">In attesa del video…</div>
 <div id="file" hidden><label>Tocca qui per scegliere un video VR180<input type="file" id="fileProva" accept="video/*"></label></div>
 <audio id="audioRemoto" autoplay></audio>
@@ -285,6 +287,7 @@ function ridimensiona(){ renderer.setSize(canvas.clientWidth, canvas.clientHeigh
 
 function disegna(){
   if (demo && demo !== 'foto') disegnaDemo(performance.now() / 1000);
+  if (guida) disegnaGuida();
   animaReazioni();
   const w = canvas.clientWidth, h = canvas.clientHeight;
   if (moto && haDati) camera.quaternion.copy(qOff).multiply(qDev);
@@ -338,6 +341,41 @@ handlers.setMotion = c => { moto = !!c.on; haOff = false; haDati = false; };
 handlers.recenter = () => { haOff = false; yaw = 0; pitch = 0; };
 handlers.setFormat = c => { formato = ['tb', 'fisheye'].includes(c.value) ? c.value : 'sbs'; if (demo && demo !== 'foto') preparaDemo(); costruisciSfere(); };
 handlers.setFisheye = c => { fe = pulisciFe(c.value); salvaFe(); costruisciSfere(); };
+/* Guida calibrazione: mostra il fotogramma piatto con i cerchi calcolati, per allinearli a occhio */
+let guida = false;
+const guidaCanvas = document.getElementById('guida'), gctx = guidaCanvas.getContext('2d');
+handlers.feGuide = c => { guida = !!c.on; guidaCanvas.hidden = !guida; };
+function disegnaGuida(){
+  const src = demo === 'foto' || (demo && !video.videoWidth) ? demoCanvas : video;
+  const W = src.videoWidth || src.width, H = src.videoHeight || src.height;
+  const cw = guidaCanvas.clientWidth, ch = guidaCanvas.clientHeight, dpr = window.devicePixelRatio || 1;
+  if (guidaCanvas.width !== cw * dpr || guidaCanvas.height !== ch * dpr) { guidaCanvas.width = cw * dpr; guidaCanvas.height = ch * dpr; }
+  gctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  gctx.fillStyle = '#000'; gctx.fillRect(0, 0, cw, ch);
+  if (!W || !H) return;  // the #hint overlay already says "In attesa del video…"
+  const k = Math.min(cw / W, ch / H), ox = (cw - W * k) / 2, oy = (ch - H * k) / 2;
+  try { gctx.drawImage(src, ox, oy, W * k, H * k); } catch {}
+  const mezzo = W / 2, R = Math.min(mezzo, H) / 2 * fe.raggio / 100;
+  gctx.lineWidth = 2;
+  for (const occhio of [0, 1]) {
+    // stesso centro usato dalla mappatura (v cresce verso l'alto nella texture, quindi y si inverte)
+    const cx = occhio * mezzo + mezzo / 2 + fe.dx;
+    const cy = H / 2 - (fe.dy + (occhio === 1 ? fe.occhio : 0));
+    const x = ox + cx * k, y = oy + cy * k, r = R * k;
+    const col = occhio === 0 ? '#22D3EE' : '#FF4D6D';
+    gctx.strokeStyle = col; gctx.setLineDash([]);
+    gctx.beginPath(); gctx.arc(x, y, r, 0, Math.PI * 2); gctx.stroke();
+    gctx.setLineDash([6, 5]);                                   // bordo dei 180° davvero mostrati
+    gctx.beginPath(); gctx.arc(x, y, r * 180 / fe.fov, 0, Math.PI * 2); gctx.stroke();
+    gctx.setLineDash([]);
+    gctx.beginPath(); gctx.moveTo(x - 12, y); gctx.lineTo(x + 12, y); gctx.moveTo(x, y - 12); gctx.lineTo(x, y + 12); gctx.stroke();
+    gctx.fillStyle = col; gctx.font = 'bold 13px sans-serif'; gctx.textAlign = 'center';
+    gctx.fillText(occhio === 0 ? 'Occhio sinistro' : 'Occhio destro', x, Math.min(ch - 28, y + r + 18));  // sotto: in alto a destra c'è il pulsante schermo intero
+  }
+  gctx.strokeStyle = 'rgba(255,255,255,.35)'; gctx.setLineDash([4, 6]);
+  gctx.beginPath(); gctx.moveTo(ox, oy + H * k / 2); gctx.lineTo(ox + W * k, oy + H * k / 2); gctx.stroke();  // orizzonte comune
+  gctx.setLineDash([]);
+}
 handlers.resetFisheye = () => { fe = { ...FE_BASE }; salvaFe(); costruisciSfere(); send({ type:'fisheye', value: fe }); };
 handlers.showImage = c => {
   if (chiamataV) { stato('Chiudi prima la chiamata per guardare una foto.'); return; }

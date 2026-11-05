@@ -1,6 +1,7 @@
 import Slider from "@react-native-community/slider";
 import { StyleSheet, Text, View } from "react-native";
 
+import { CameraProfiles } from "@/src/components/CameraProfiles";
 import { Btn } from "@/src/components/ui";
 import { colors, fonts, spacing } from "@/src/theme";
 
@@ -16,10 +17,35 @@ const SLIDERS: { key: keyof Fisheye; label: string; min: number; max: number; un
   { key: "occhio", label: "Allineamento verticale occhio destro", min: -40, max: 40, unit: " px" },
 ];
 
-export function FisheyePanel({ value, onChange, onReset }: { value: Fisheye; onChange: (v: Fisheye) => void; onReset: () => void }) {
+export function FisheyePanel({
+  value,
+  onChange,
+  onReset,
+  guide,
+  onGuide,
+}: {
+  value: Fisheye;
+  onChange: (v: Fisheye) => void;
+  onReset: () => void;
+  guide: boolean;
+  onGuide: (on: boolean) => void;
+}) {
   return (
     <View style={styles.panel} testID="viewer-fisheye-panel">
       <Text style={styles.note}>Regola i cerchi guardando l'anteprima. Le regolazioni restano salvate solo su questo visore.</Text>
+      <Btn
+        compact
+        testID="viewer-fisheye-guide-button"
+        label={guide ? "Torna alla vista 3D" : "Guida calibrazione"}
+        icon={guide ? "eye" : "target"}
+        variant={guide ? "primary" : "secondary"}
+        onPress={() => onGuide(!guide)}
+      />
+      {guide ? (
+        <Text style={styles.note} testID="viewer-fisheye-guide-help">
+          Nell'anteprima vedi il video piatto: sposta i cerchi pieni sul bordo delle due immagini tonde. Il tratteggio indica i 180° che vedrai nel visore.
+        </Text>
+      ) : null}
       {SLIDERS.map((s) => (
         <View key={s.key}>
           <View style={styles.row}>
@@ -46,6 +72,7 @@ export function FisheyePanel({ value, onChange, onReset }: { value: Fisheye; onC
         </View>
       ))}
       <Btn compact testID="viewer-fisheye-reset-button" label="Ripristina valori iniziali" icon="rotate-ccw" onPress={onReset} />
+      <CameraProfiles value={value} onApply={onChange} />
     </View>
   );
 }

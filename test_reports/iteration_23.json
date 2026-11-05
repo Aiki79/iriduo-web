@@ -1,0 +1,25 @@
+{
+  "summary": "Frontend-only retest of the iteration 22 bug on /viewer at 375x667, with localStorage onboarded=true and viewer_format=fisheye. The bug is FIXED. I turned the guide on and reloaded the stage frame (location.reload(), with no swap/view/motion toggle beforehand). The stage received {feGuide,on:true}, guida=true, #guida was visible, and the RN button still read 'Torna alla vista 3D'. Guide-off case PASSES in two places: on a fresh load, and after turning the guide on then off. In both, the reload sent on:false, #guida stayed hidden and the button read 'Guida calibrazione'. Caption: 'Guida calibrazione' is removed from both the served stage.html and the canvas. I recorded every gctx.fillText call while the 'sfere' demo was running: only 'Occhio sinistro' (85,163) and 'Occhio destro' (256,163) are drawn. Sanity check PASSES. Moving the dx slider set the value to 79 px and the stage fe.dx to 79. I saved profile TEST_Cam, pressed reset (dx back to 0 in the UI and on the stage), then applied the profile (dx 79 in the UI and on the stage). The guide stayed on throughout. Delete with confirmation removed the profile. No page errors.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/viewer guide on, no video", "issues": ["Cosmetic: the text 'In attesa del video…' appears twice, slightly offset. One copy is drawn on the guide canvas (stage.html:355). The other is the #hint div (stage.html:27), which comes after the canvas in the DOM and paints on top of it. Hide #hint while the guide is on, or drop the canvas text."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["browser_automation scripts (inline, iteration 23)"],
+  "action_items": [
+    "LOW (cosmetic): avoid the duplicate 'In attesa del video…' when the guide is on and no video is loaded. Hide #hint while guida is true, or skip the canvas fillText at stage.html:355."
+  ],
+  "critical_code_review_comments": [
+    "viewer.tsx:316 deps now include guide ([format, swap, view, motion, guide, send]). video/photo are still left out, but they are stable route params, so this is fine."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped)", "frontend": "100% (4/4 requested checks passed)"},
+  "seed_data_creation": "None. The browser-localStorage profile TEST_Cam was created and then deleted.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "To capture guide text, wrap gctx.fillText inside the stage frame at runtime (frame.evaluate), because the init-script prototype patch did not reliably reach the frame. Use handlers.demo({name:'sfere'}) in the frame to get a source frame so the eye labels get drawn."
+}

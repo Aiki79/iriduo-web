@@ -83,6 +83,13 @@ export default function Viewer() {
     });
   }, [photo, video]);
   const [fe, setFe] = useState<Fisheye>(FE_BASE);
+  const [guide, setGuide] = useState(false);
+  useEffect(() => {
+    if (format !== "fisheye" && guide) {
+      setGuide(false);
+      stage.current?.send({ type: "feGuide", on: false });
+    }
+  }, [format, guide]);
   const [swap, setSwap] = useState(false);
   const [view, setView] = useState<"drag" | "split">("drag");
   const [motion, setMotion] = useState(false);
@@ -181,6 +188,7 @@ export default function Viewer() {
           send({ type: "setSwap", on: swap });
           send({ type: "setView", value: view });
           send({ type: "setMotion", on: motion });
+          send({ type: "feGuide", on: guide && format === "fisheye" });
           if (video && !isWeb) {
             setMediaMsg({ text: "Carico la registrazione…", tone: "info" });
             sendVideoFile(video, (c) => send(c))
@@ -305,7 +313,7 @@ export default function Viewer() {
           break;
       }
     },
-    [format, swap, view, motion, send],
+    [format, swap, view, motion, guide, send],
   );
 
   useEffect(() => send({ type: "setFormat", value: format }), [format, send]);
@@ -578,6 +586,11 @@ export default function Viewer() {
                 send({ type: "setFisheye", value: v });
               }}
               onReset={() => send({ type: "resetFisheye" })}
+              guide={guide}
+              onGuide={(on) => {
+                setGuide(on);
+                send({ type: "feGuide", on });
+              }}
             />
           )}
           <Toggle testID="viewer-swap-toggle" label="Scambia occhio sinistro e destro" value={swap} onChange={setSwap} />

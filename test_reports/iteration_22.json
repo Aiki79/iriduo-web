@@ -1,0 +1,28 @@
+{
+  "summary": "Frontend-only retest of the iteration 21 fixes on /viewer (375x667, plus 320x640 and fullscreen). One of the three fixes still fails: stage reload while the guide is on. After frame.evaluate('location.reload()'), the stage receives {type:'feGuide',on:false} and ends with guida=false and #guida hidden. The RN button still reads 'Torna alla vista 3D'. Root cause: the onEvent useCallback dependency array (viewer.tsx:316) is missing `guide`, so the 'ready' handler reads a stale guide=false. Proof: after turning the guide on and toggling swap twice (which rebuilds the callback), the same reload sends on:true, and #guida is visible again. The label fix PASSES: the labels are at y=min(ch-28, y+r+18). Inline 375: (85,163)/(256,163). Inline 320: y=132. Fullscreen 320x640: y=418, below the circles. The fullscreen button covers canvas y 8-56, so it no longer overlaps any label. The 'Guida calibrazione' caption is at (10, ch-10). The cancel-delete fix PASSES: viewer-profile-cancel-delete-TEST_Cam (48x56) appears next to 'Elimina'. Tapping it brings back the trash icon, the row stays and localStorage is unchanged. Tapping confirm deletes the row, localStorage becomes '[]' and the empty state comes back. Regression passed: dx slider (95 px goes to the stage fe), profile save, persistence after reload, reset then apply (dx 0 to 95, stage fe updated), guide toggle on/off, switching to sbs hides the panel and turns the guide off, and going back to fisheye leaves the guide off. No page errors.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Guide state after stage reload (NOT FIXED)", "issue": "The 'ready' handler sends feGuide on:false even though RN guide=true. onEvent is a useCallback with deps [format, swap, view, motion, send] (viewer.tsx:316), and `guide` is not in that list, so the closure is stale. Repro: turn the guide on, then in the stage frame run location.reload(). The stage gets {feGuide,on:false}, guida=false, and the button still reads 'Torna alla vista 3D'.", "testID": "viewer-fisheye-guide-button", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/viewer inline guide preview", "issues": ["Cosmetic: in the small inline preview the frame fills the full height, so the labels clamp to ch-28 and sit inside the bottom of the circles. The 'Guida calibrazione' caption at bottom-left crosses the cyan circle stroke. Both are still readable. In fullscreen the labels sit cleanly below the circles.", "At 320px the WhatsApp share button label is truncated to 'What…' (minor, unrelated)."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["browser_automation scripts (inline, iteration 22)"],
+  "action_items": [
+    "MEDIUM: add `guide` to the onEvent useCallback deps in /app/frontend/app/viewer.tsx:316 ([format, swap, view, motion, guide, send]), or read it from a ref, so the 'ready' handler re-sends the real guide state after a stage reload."
+  ],
+  "critical_code_review_comments": [
+    "onEvent deps also omit `video`/`photo`, which are used in 'ready'. These are route params and stable, so it is not a bug today, but a ref-based handler would make this class of stale-closure bug impossible."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped)", "frontend": "2/3 fixes verified; the regression checks passed"},
+  "seed_data_creation": "None. Created the browser-localStorage profile TEST_Cam and deleted it during the test.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Each browser_automation call uses a fresh context, so localStorage does not carry over between calls. Use page.add_init_script to log messages inside the stage frame (window.__msgs) so they survive the stage location.reload(). To check the feGuide fix: turn the guide on, run location.reload() in the frame, wait 5s, then check guida===true and the feGuide message has on:true. Do not toggle swap/view/motion first, because that hides the bug.",
+  "rca_of_issue": "Stale closure: the onEvent callback is memoized on [format, swap, view, motion, send], so toggling `guide` does not rebuild it, and 'ready' reads the guide value from the last time a dependency changed (usually false). Confirmed: with no dependency change, the reload sends on:false. After toggling swap twice, the reload sends on:true. Fix: add guide to the deps (or use a guideRef)."
+}

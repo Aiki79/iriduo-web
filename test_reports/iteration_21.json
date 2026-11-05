@@ -1,0 +1,30 @@
+{
+  "summary": "Frontend-only test of the fisheye calibration guide and camera profiles on /viewer, at 375x667 and 320x640. The guide works: the button toggles to 'Torna alla vista 3D' and back, the help text shows and hides, the stage receives {type:'feGuide',on:true/false}, and #guida unhides/hides. With the 'sfere' demo running, the arc calls we captured matched the formula exactly: frame 2048x1024, default circles at (85.25,95.5) and (255.75,95.5) with r=85.25, cyan left and red right, plus the dashed 180-degree ring. After moving the sliders (dx=95, raggio=84, occhio=21), the circles updated live to the expected values (101.07,95.5,r=71.61) and (271.57,92.0). Switching to sbs sends feGuide off, hides #guida and hides the panel; going back to fisheye leaves the guide off. Profiles work: empty state shows; save is disabled for empty or whitespace-only names; saved meta reads '187° · cerchio 100% · centro 0/0 px'; a second profile 'B' saves; applying a profile updates the slider labels, the stage fe and the stage's localStorage 'fisheye'; the active row gets the brand border and check icon; saving 'b' overwrites 'B' (2 rows, name becomes 'b'); the list persists after reload as a JSON-string under fisheye_profiles; delete then confirm removes the row. Regression passed: sliders, reset (labels and stage go back to FE_BASE), format persistence after reload, sbs 3D demo render (2 meshes visible, guide hidden). No page errors. One minor state mismatch: see rca_of_issue.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Guide state after stage reload", "issue": "If the stage iframe/WebView reloads while the guide is on (for example the Android WebView process restarts), the stage starts with guida=false. The RN button still reads 'Torna alla vista 3D' and the help text stays visible, but the stage shows the 3D view. The 'ready' handler in viewer.tsx (~line 186) re-sends setFormat, setSwap, setView and setMotion, but not feGuide.", "testID": "viewer-fisheye-guide-button", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/viewer guide preview", "issues": ["The 'Occhio destro' label is drawn at the top-right of the guide canvas, under the fullscreen button, so it is partly hidden.", "The delete confirmation ('Elimina') has no cancel. It stays armed until you tap it or remount the screen (minor UX)."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["browser_automation scripts (inline, iteration 21)"],
+  "action_items": [
+    "LOW: in the viewer.tsx onEvent 'ready' case, also send({type:'feGuide', on: guide}), or call setGuide(false), so the RN button stays in sync after a stage reload.",
+    "LOW (optional): move the 'Occhio destro' guide label so the fullscreen button doesn't cover it, and/or let the user cancel the delete confirmation (tap elsewhere or a timeout)."
+  ],
+  "critical_code_review_comments": [
+    "When a profile is overwritten through a different-case name, the row testID changes ('viewer-profile-B' becomes 'viewer-profile-b'). This matches the code (the new name is kept); just noting it for tests.",
+    "sameFe compares all 5 keys strictly. That is fine because the slider values are integers."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped)", "frontend": "100% of requested flows (one low-priority desync on stage reload)"},
+  "seed_data_creation": "None. Only browser localStorage in the test browser was used (TEST_ profile created at 320px).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Set localStorage onboarded='true' and viewer_format=JSON.stringify('fisheye'). Find the stage frame in page.frames by '/api/stage' in its url; the globals guida, guidaCanvas, gctx, fe, formato, demo, mesh and demoCanvas are top-level there. To check circles, wrap gctx.arc inside the frame and record its args. Clicking a point on a slider's bounding box sets its value. Profiles are stored in localStorage 'fisheye_profiles' as a JSON-encoded string.",
+  "rca_of_issue": "Guide desync: the guide state lives in RN (useState guide) and is only pushed to the stage on button press. Stage reload (location.reload / WebView restart) starts with guida=false, and 'ready' does not re-push it. Repro: turn the guide on, then in the stage frame run location.reload(). The button still shows 'Torna alla vista 3D' while guida=false. Fix: re-send feGuide on 'ready'."
+}
