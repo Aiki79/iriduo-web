@@ -1,6 +1,7 @@
 import { createElement, useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
 import { StyleSheet, View } from "react-native";
 
+import { tr } from "@/src/i18n";
 import { colors } from "@/src/theme";
 import { stageOrigin, stageUrl, type StageCmd, type StageEvent, type StageHandle } from "./stage-types";
 
@@ -43,7 +44,7 @@ export function StageView({ mode, onEvent, ref, testID, query }: Props) {
         key,
         ref: frame,
         src: stageUrl(mode, query),
-        title: "Scena VR180",
+        title: tr("Scena VR180", "VR180 scene"),
         allow: "camera; microphone; autoplay; fullscreen; xr-spatial-tracking",
         style: { border: 0, width: "100%", height: "100%", background: colors.stage, display: "block" },
       })}

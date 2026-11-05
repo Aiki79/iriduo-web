@@ -66,7 +66,7 @@ function ShimmerFill({ style }: { style: TextStyle }) {
           </Animated.View>
         </>
       )}
-      <Text style={[style, styles.hidden]}>Duo</Text>
+      <Text maxFontSizeMultiplier={1.3} style={[style, styles.hidden]}>Duo</Text>
     </View>
   );
 }
@@ -75,7 +75,7 @@ function ShimmerFill({ style }: { style: TextStyle }) {
 export function GradientTitle({ style, testID }: { style: TextStyle; testID?: string }) {
   const s = (style.fontSize ?? 44) / 64; // offsets tuned on a 64pt title
   const layer = (color: string, dx: number, dy: number, glow?: boolean) => (
-    <Text
+    <Text maxFontSizeMultiplier={1.3}
       style={[
         style,
         styles.abs,
@@ -88,15 +88,15 @@ export function GradientTitle({ style, testID }: { style: TextStyle; testID?: st
   );
   const gradient =
     Platform.OS === "web" ? (
-      <Text style={[style, WEB_BG, WEB_ANIM]}>Duo</Text>
+      <Text maxFontSizeMultiplier={1.3} style={[style, WEB_BG, WEB_ANIM]}>Duo</Text>
     ) : (
-      <Mask maskElement={<Text style={style}>Duo</Text>}>
+      <Mask maskElement={<Text maxFontSizeMultiplier={1.3} style={style}>Duo</Text>}>
         <ShimmerFill style={style} />
       </Mask>
     );
   return (
     <View style={styles.row} testID={testID} accessible accessibilityRole="header" accessibilityLabel="IriDuo">
-      <Text style={[style, { color: colors.onSurface }]}>Iri</Text>
+      <Text maxFontSizeMultiplier={1.3} style={[style, { color: colors.onSurface }]}>Iri</Text>
       <View>
         {layer(GLOW, 0, 0, true)}
         {layer(RED_SHADOW, 4, 3)}

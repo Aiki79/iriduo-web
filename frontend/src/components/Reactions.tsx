@@ -4,17 +4,18 @@ import { useEffect, useState, type ComponentProps } from "react";
 import { Platform, Pressable, StyleSheet, View } from "react-native";
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 
+import { tr } from "@/src/i18n";
 import { colors, radius, spacing } from "@/src/theme";
 
 type MdiName = ComponentProps<typeof MaterialDesignIcons>["name"];
 
 // Reaction colors are fixed (they mean the same thing in every theme)
-export const REACTIONS: { kind: string; icon: MdiName; color: string; label: string }[] = [
-  { kind: "heart", icon: "heart", color: "#E0605C", label: "Cuore" },
-  { kind: "clap", icon: "hand-clap", color: "#E0A85C", label: "Applauso" },
-  { kind: "star", icon: "star", color: "#F2D15C", label: "Stella" },
-  { kind: "like", icon: "thumb-up", color: "#5CC8E0", label: "Mi piace" },
-  { kind: "wow", icon: "emoticon-excited", color: "#5CE093", label: "Wow" },
+export const REACTIONS: { kind: string; icon: MdiName; color: string; label: [string, string] }[] = [
+  { kind: "heart", icon: "heart", color: "#E0605C", label: ["Cuore", "Heart"] },
+  { kind: "clap", icon: "hand-clap", color: "#E0A85C", label: ["Applauso", "Applause"] },
+  { kind: "star", icon: "star", color: "#F2D15C", label: ["Stella", "Star"] },
+  { kind: "like", icon: "thumb-up", color: "#5CC8E0", label: ["Mi piace", "Like"] },
+  { kind: "wow", icon: "emoticon-excited", color: "#5CE093", label: ["Wow", "Wow"] },
 ];
 
 export type FloatingReaction = { id: string; kind: string };
@@ -33,7 +34,7 @@ export function ReactionBar({ onReact, testID, compact, unlocked = REACTIONS.len
             key={r.kind}
             testID={`${testID}-${r.kind}${locked ? "-locked" : ""}`}
             accessibilityRole="button"
-            accessibilityLabel={locked ? `${r.label}: disponibile con Pro` : `Invia reazione: ${r.label}`}
+            accessibilityLabel={locked ? tr(`${r.label[0]}: disponibile con Pro`, `${r.label[1]}: available with Pro`) : tr(`Invia reazione: ${r.label[0]}`, `Send reaction: ${r.label[1]}`)}
             onPress={() => {
               if (locked) return onLocked?.();
               if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);

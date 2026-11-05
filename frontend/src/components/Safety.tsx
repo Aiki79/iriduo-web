@@ -4,15 +4,16 @@ import { Modal, Pressable, StyleSheet, Text, TextInput, View } from "react-nativ
 
 import { Btn } from "@/src/components/ui";
 import type { StageEvent } from "@/src/components/stage-types";
+import { tr } from "@/src/i18n";
 import { colors, fonts, radius, spacing } from "@/src/theme";
 import { storage } from "@/src/utils/storage";
 
-const REASONS: { id: string; label: string }[] = [
-  { id: "molestie", label: "Molestie o insulti" },
-  { id: "sessuale", label: "Contenuti sessuali" },
-  { id: "minore", label: "Sembra un minorenne" },
-  { id: "spam", label: "Spam o truffa" },
-  { id: "altro", label: "Altro" },
+const REASONS = (): { id: string; label: string }[] => [
+  { id: "molestie", label: tr("Molestie o insulti", "Harassment or insults") },
+  { id: "sessuale", label: tr("Contenuti sessuali", "Sexual content") },
+  { id: "minore", label: tr("Sembra un minorenne", "Seems to be a minor") },
+  { id: "spam", label: tr("Spam o truffa", "Spam or scam") },
+  { id: "altro", label: tr("Altro", "Other") },
 ];
 
 const BLOCKED_KEY = "blocked_codes";
@@ -54,13 +55,13 @@ export function useSafety(role: "viewer" | "sender", send: Send, peerCode?: stri
         setPeerRec(e.on);
         return true;
       case "recWaiting":
-        setMsg("Ho chiesto il consenso all'altra persona…");
+        setMsg(tr("Ho chiesto il consenso all'altra persona…", "Asked the other person for consent…"));
         return true;
       case "reported":
-        setMsg(e.ok ? "Segnalazione inviata. Grazie!" : "Segnalazione non inviata, riprova.");
+        setMsg(e.ok ? tr("Segnalazione inviata. Grazie!", "Report sent. Thank you!") : tr("Segnalazione non inviata, riprova.", "Report not sent, try again."));
         return true;
       case "blocked":
-        setMsg("Utente bloccato: non potrà più chiamarti.");
+        setMsg(tr("Utente bloccato: non potrà più chiamarti.", "User blocked: they can't call you anymore."));
         return true;
       case "suspended":
         setSuspended(true);
@@ -83,7 +84,7 @@ export function useSafety(role: "viewer" | "sender", send: Send, peerCode?: stri
     else if (peerCode) {
       await blockCode(peerCode);
       send({ type: "hangup" });
-      setMsg(`Codice ${peerCode} bloccato: non potrai più chiamarlo per errore.`);
+      setMsg(tr(`Codice ${peerCode} bloccato: non potrai più chiamarlo per errore.`, `Code ${peerCode} blocked: you can't call it by mistake anymore.`));
     }
     onBlocked?.();
   };
@@ -94,7 +95,7 @@ export function useSafety(role: "viewer" | "sender", send: Send, peerCode?: stri
       <View style={styles.wrap}>
         {suspended ? (
           <View style={styles.rec} testID={`${role}-suspended-banner`}>
-            <Text style={styles.recText}>Account sospeso: è stato segnalato da più utenti. Non puoi fare né ricevere chiamate.</Text>
+            <Text style={styles.recText}>{tr("Account sospeso: è stato segnalato da più utenti. Non puoi fare né ricevere chiamate.", "Account suspended: it was reported by several users. You can't make or receive calls.")}</Text>
           </View>
         ) : null}
         {msg ? (
@@ -110,15 +111,15 @@ export function useSafety(role: "viewer" | "sender", send: Send, peerCode?: stri
       {peerRec ? (
         <View style={styles.rec} testID={`${role}-peer-rec-banner`}>
           <View style={styles.dot} />
-          <Text style={styles.recText}>L'altra persona sta registrando questa chiamata</Text>
+          <Text style={styles.recText}>{tr("L'altra persona sta registrando questa chiamata", "The other person is recording this call")}</Text>
         </View>
       ) : null}
       <View style={styles.row}>
-        <Btn compact testID={`${role}-report-button`} label="Segnala" icon="flag" onPress={() => setReport(true)} style={styles.flex} />
+        <Btn compact testID={`${role}-report-button`} label={tr("Segnala", "Report")} icon="flag" onPress={() => setReport(true)} style={styles.flex} />
         {confirmBlock ? (
-          <Btn compact testID={`${role}-block-confirm`} label="Sicuro? Blocca" icon="slash" variant="danger" onPress={block} style={styles.flex} />
+          <Btn compact testID={`${role}-block-confirm`} label={tr("Sicuro? Blocca", "Sure? Block")} icon="slash" variant="danger" onPress={block} style={styles.flex} />
         ) : (
-          <Btn compact testID={`${role}-block-button`} label="Blocca" icon="slash" onPress={() => setConfirmBlock(true)} style={styles.flex} />
+          <Btn compact testID={`${role}-block-button`} label={tr("Blocca", "Block")} icon="slash" onPress={() => setConfirmBlock(true)} style={styles.flex} />
         )}
       </View>
 
@@ -126,13 +127,13 @@ export function useSafety(role: "viewer" | "sender", send: Send, peerCode?: stri
         <View style={styles.backdrop}>
           <View style={styles.sheet} testID={`${role}-rec-consent`}>
             <Feather name="video" size={28} color={colors.accent} />
-            <Text style={styles.title}>L'altra persona vuole registrare</Text>
-            <Text style={styles.body}>La chiamata verrà salvata sul suo dispositivo. Se accetti, vedrai un avviso rosso per tutta la registrazione.</Text>
+            <Text style={styles.title}>{tr("L'altra persona vuole registrare", "The other person wants to record")}</Text>
+            <Text style={styles.body}>{tr("La chiamata verrà salvata sul suo dispositivo. Se accetti, vedrai un avviso rosso per tutta la registrazione.", "The call will be saved on their device. If you accept, you'll see a red warning for the whole recording.")}</Text>
             <View style={styles.row}>
               <Btn
                 compact
                 testID={`${role}-rec-deny`}
-                label="Non accetto"
+                label={tr("Non accetto", "Decline")}
                 style={styles.flex}
                 onPress={() => {
                   setAsk(false);
@@ -142,7 +143,7 @@ export function useSafety(role: "viewer" | "sender", send: Send, peerCode?: stri
               <Btn
                 compact
                 testID={`${role}-rec-allow`}
-                label="Accetto"
+                label={tr("Accetto", "Accept")}
                 variant="primary"
                 style={styles.flex}
                 onPress={() => {
@@ -158,8 +159,8 @@ export function useSafety(role: "viewer" | "sender", send: Send, peerCode?: stri
       <Modal visible={report} transparent animationType="slide" onRequestClose={() => setReport(false)}>
         <View style={styles.backdrop}>
           <View style={styles.sheet} testID={`${role}-report-sheet`}>
-            <Text style={styles.title}>Segnala questo utente</Text>
-            {REASONS.map((r) => (
+            <Text style={styles.title}>{tr("Segnala questo utente", "Report this user")}</Text>
+            {REASONS().map((r) => (
               <Pressable
                 key={r.id}
                 testID={`${role}-report-reason-${r.id}`}
@@ -176,18 +177,18 @@ export function useSafety(role: "viewer" | "sender", send: Send, peerCode?: stri
               testID={`${role}-report-note`}
               value={note}
               onChangeText={setNote}
-              placeholder="Cosa è successo? (facoltativo)"
+              placeholder={tr("Cosa è successo? (facoltativo)", "What happened? (optional)")}
               placeholderTextColor={colors.muted}
               maxLength={500}
               multiline
               style={styles.input}
             />
             <View style={styles.row}>
-              <Btn compact testID={`${role}-report-cancel`} label="Annulla" style={styles.flex} onPress={() => setReport(false)} />
+              <Btn compact testID={`${role}-report-cancel`} label={tr("Annulla", "Cancel")} style={styles.flex} onPress={() => setReport(false)} />
               <Btn
                 compact
                 testID={`${role}-report-send`}
-                label="Invia"
+                label={tr("Invia", "Send")}
                 icon="send"
                 variant="primary"
                 style={styles.flex}

@@ -2,6 +2,8 @@ import { Feather } from "@react-native-vector-icons/feather";
 import { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
+import { qualityLabel } from "@/src/history";
+import { tr } from "@/src/i18n";
 import { colors, fonts, radius, spacing } from "@/src/theme";
 
 export type CallStatsData = { kbps: number; fps: number; w: number; h: number; rtt: number | null; loss: number };
@@ -69,21 +71,21 @@ export function CallStatsCard({ startedAt, stats, testID, direction }: { started
     <View style={styles.card} testID={testID}>
       <View style={styles.cardTop}>
         <View>
-          <Text style={styles.caption}>Durata chiamata</Text>
+          <Text style={styles.caption}>{tr("Durata chiamata", "Call duration")}</Text>
           <Text style={styles.time} testID={`${testID}-time`}>
             {formatDuration(elapsed)}
           </Text>
         </View>
         <View style={[styles.quality, { backgroundColor: q.color }]} testID={`${testID}-quality`}>
           <Feather name="wifi" size={16} color={q.on} />
-          <Text style={[styles.qualityText, { color: q.on }]}>{q.label}</Text>
+          <Text style={[styles.qualityText, { color: q.on }]}>{qualityLabel(q.label)}</Text>
         </View>
       </View>
       <View style={styles.metrics}>
-        <Metric label={direction === "in" ? "Ricevo" : "Invio"} value={`${mbps} Mbit/s`} testID={`${testID}-bitrate`} />
-        <Metric label="Fotogrammi" value={stats ? `${stats.fps} fps` : "–"} testID={`${testID}-fps`} />
-        <Metric label="Ritardo" value={stats?.rtt != null ? `${stats.rtt} ms` : "–"} testID={`${testID}-rtt`} />
-        <Metric label="Persi" value={stats ? `${stats.loss}%` : "–"} testID={`${testID}-loss`} />
+        <Metric label={direction === "in" ? tr("Ricevo", "Receiving") : tr("Invio", "Sending")} value={`${mbps} Mbit/s`} testID={`${testID}-bitrate`} />
+        <Metric label={tr("Fotogrammi", "Frames")} value={stats ? `${stats.fps} fps` : "–"} testID={`${testID}-fps`} />
+        <Metric label={tr("Ritardo", "Delay")} value={stats?.rtt != null ? `${stats.rtt} ms` : "–"} testID={`${testID}-rtt`} />
+        <Metric label={tr("Persi", "Lost")} value={stats ? `${stats.loss}%` : "–"} testID={`${testID}-loss`} />
       </View>
       {stats && stats.w > 0 ? <Text style={styles.res}>Video {stats.w} × {stats.h}</Text> : null}
     </View>

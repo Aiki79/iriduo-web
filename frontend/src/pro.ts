@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 
+import { tr } from "@/src/i18n";
 import { storage } from "@/src/utils/storage";
 
 /**
@@ -9,9 +10,9 @@ import { storage } from "@/src/utils/storage";
 export type Plan = "monthly" | "annual";
 export type ProState = { pro: boolean; plan: Plan | null; month: string; hdCalls: number };
 
-export const PLANS: { id: Plan; label: string; price: string; note: string }[] = [
-  { id: "monthly", label: "Mensile", price: "6,99 € / mese", note: "Disdici quando vuoi" },
-  { id: "annual", label: "Annuale", price: "59,99 € / anno", note: "Risparmi circa il 28%" },
+export const PLANS = (): { id: Plan; label: string; price: string; note: string }[] => [
+  { id: "monthly", label: tr("Mensile", "Monthly"), price: tr("6,99 € / mese", "€6.99 / month"), note: tr("Disdici quando vuoi", "Cancel anytime") },
+  { id: "annual", label: tr("Annuale", "Yearly"), price: tr("59,99 € / anno", "€59.99 / year"), note: tr("Risparmi circa il 28%", "Save about 28%") },
 ];
 
 export const FREE_HD_CALLS = 3;

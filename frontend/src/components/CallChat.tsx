@@ -1,19 +1,28 @@
 import { Feather } from "@react-native-vector-icons/feather";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ComponentRef } from "react";
 import { type NativeScrollEvent, type NativeSyntheticEvent, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import Animated, { FadeInUp, FadeOut } from "react-native-reanimated";
 
 import { Chip, ChipRow } from "@/src/components/ui";
+import { getLang, tr } from "@/src/i18n";
 import { colors, fonts, radius, spacing } from "@/src/theme";
 
 export type ChatMessage = { id: string; from: "me" | "them"; text: string; at: number; failed?: boolean; label?: string };
 
-export const QUICK_REPLIES = ["Ti vedo bene", "Non ti sento", "Avvicinati", "Allontanati", "Va bene!", "Un attimo…"];
+const QUICK_IT = ["Ti vedo bene", "Non ti sento", "Avvicinati", "Allontanati", "Va bene!", "Un attimo…"];
+const QUICK_EN = ["I can see you well", "I can't hear you", "Come closer", "Move back", "OK!", "Just a moment…"];
+export const QUICK_REPLIES = () => (getLang() === "en" ? QUICK_EN : QUICK_IT);
+
+/** A quick reply arrives in the sender's language: show it in ours. Free text stays as written. */
+const localizeQuick = (text: string) => {
+  const i = Math.max(QUICK_IT.indexOf(text), QUICK_EN.indexOf(text));
+  return i >= 0 ? QUICK_REPLIES()[i] : text;
+};
 
 export const newMessage = (from: "me" | "them", text: string, label?: string): ChatMessage => ({
   id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
   from,
-  text,
+  text: localizeQuick(text),
   at: Date.now(),
   label,
 });
@@ -24,7 +33,7 @@ function Bubble({ m, testID }: { m: ChatMessage; testID: string }) {
     <View style={[styles.bubble, me ? styles.me : styles.them]} testID={testID}>
       {!me && m.label ? <Text style={styles.label}>{m.label}</Text> : null}
       <Text style={[styles.bubbleText, { color: me ? colors.onBrandPrimary : colors.onSurface }]}>{m.text}</Text>
-      {m.failed ? <Text style={styles.failed}>Non inviato</Text> : null}
+      {m.failed ? <Text style={styles.failed}>{tr("Non inviato", "Not sent")}</Text> : null}
     </View>
   );
 }
@@ -41,7 +50,7 @@ export function ChatComposer({ onSend, testID, autoFocus }: { onSend: (t: string
   return (
     <View>
       <ChipRow testID={`${testID}-quick`}>
-        {QUICK_REPLIES.map((q, i) => (
+        {QUICK_REPLIES().map((q, i) => (
           <Chip key={q} testID={`${testID}-quick-${i}`} label={q} selected={false} onPress={() => onSend(q)} />
         ))}
       </ChipRow>
@@ -50,7 +59,7 @@ export function ChatComposer({ onSend, testID, autoFocus }: { onSend: (t: string
           testID={`${testID}-input`}
           value={text}
           onChangeText={setText}
-          placeholder="Scrivi un messaggio…"
+          placeholder={tr("Scrivi un messaggio…", "Write a message…")}
           placeholderTextColor={colors.muted}
           maxLength={300}
           returnKeyType="send"
@@ -61,7 +70,7 @@ export function ChatComposer({ onSend, testID, autoFocus }: { onSend: (t: string
         />
         <Pressable
           testID={`${testID}-send-button`}
-          accessibilityLabel="Invia messaggio"
+          accessibilityLabel={tr("Invia messaggio", "Send message")}
           onPress={submit}
           disabled={!text.trim()}
           style={({ pressed }) => [styles.send, !text.trim() && styles.disabled, pressed && styles.pressed]}
@@ -76,7 +85,7 @@ export function ChatComposer({ onSend, testID, autoFocus }: { onSend: (t: string
 /** Card with the latest messages and the composer (normal, non-fullscreen view). */
 export function ChatPanel({ messages, onSend, testID }: { messages: ChatMessage[]; onSend: (t: string) => void; testID: string }) {
   const last = messages.slice(-50);
-  const ref = useRef<ScrollView>(null);
+  const ref = useRef<ComponentRef<typeof ScrollView>>(null);
   const atBottom = useRef(true);
   const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
@@ -86,10 +95,10 @@ export function ChatPanel({ messages, onSend, testID }: { messages: ChatMessage[
     <View style={styles.panel} testID={testID}>
       <View style={styles.panelHead}>
         <Feather name="message-circle" size={18} color={colors.brandPrimary} />
-        <Text style={styles.panelTitle}>Messaggi</Text>
+        <Text style={styles.panelTitle}>{tr("Messaggi", "Messages")}</Text>
       </View>
       {last.length === 0 ? (
-        <Text style={styles.empty}>Nessun messaggio. Usa le risposte rapide per parlare senza interrompere il 3D.</Text>
+        <Text style={styles.empty}>{tr("Nessun messaggio. Usa le risposte rapide per parlare senza interrompere il 3D.", "No messages. Use quick replies to talk without interrupting the 3D.")}</Text>
       ) : (
         <ScrollView
           ref={ref}

@@ -8,15 +8,16 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { formatDuration } from "@/src/components/CallStats";
 import { Btn, Header, IconBtn } from "@/src/components/ui";
-import { clearHistory, getHistory, RESULT_LABEL, type CallRecord } from "@/src/history";
+import { clearHistory, getHistory, qualityLabel, RESULT_LABEL, type CallRecord } from "@/src/history";
 import { getContacts, nameFor, type Contact } from "@/src/contacts";
+import { getLang, tr, useLang } from "@/src/i18n";
 import { FREE_HISTORY, useProState } from "@/src/pro";
 import { colors, fonts, radius, spacing } from "@/src/theme";
 
 const QUALITY_COLOR: Record<string, string> = { Buona: colors.success, Media: colors.warning, Debole: colors.error };
 
 function when(at: number) {
-  return new Date(at).toLocaleString("it-IT", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+  return new Date(at).toLocaleString(getLang() === "en" ? "en-GB" : "it-IT", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 }
 
 function Row({ item, index, name }: { item: CallRecord; index: number; name?: string }) {
@@ -36,7 +37,7 @@ function Row({ item, index, name }: { item: CallRecord; index: number; name?: st
           {out && !name ? (
             <Pressable
               testID={`history-save-contact-${item.id}`}
-              accessibilityLabel="Salva in rubrica"
+              accessibilityLabel={tr("Salva in rubrica", "Save contact")}
               hitSlop={8}
               style={styles.saveBtn}
               onPress={() => router.push({ pathname: "/contacts", params: { code: item.code } })}
@@ -47,16 +48,16 @@ function Row({ item, index, name }: { item: CallRecord; index: number; name?: st
         </View>
         {name ? <Text style={styles.meta}>{item.code}</Text> : null}
         <Text style={styles.meta} numberOfLines={2}>
-          {out ? "Trasmessa" : "Ricevuta"} · {when(item.at)}
+          {out ? tr("Trasmessa", "Outgoing") : tr("Ricevuta", "Incoming")} · {when(item.at)}
         </Text>
         <View style={styles.tags}>
           <Text style={[styles.result, { color: ok ? colors.onSurface : colors.error }]}>
-            {ok ? formatDuration(item.duration) : RESULT_LABEL[item.result]}
+            {ok ? formatDuration(item.duration) : RESULT_LABEL(item.result)}
           </Text>
           {item.quality ? (
             <View style={styles.qTag}>
               <View style={[styles.dot, { backgroundColor: QUALITY_COLOR[item.quality] ?? colors.muted }]} />
-              <Text style={styles.qText}>{item.quality}</Text>
+              <Text style={styles.qText}>{qualityLabel(item.quality)}</Text>
             </View>
           ) : null}
         </View>
@@ -64,12 +65,12 @@ function Row({ item, index, name }: { item: CallRecord; index: number; name?: st
       {out ? (
         <Pressable
           testID={`history-recall-${item.id}`}
-          accessibilityLabel={`Richiama ${item.code}`}
+          accessibilityLabel={tr(`Richiama ${item.code}`, `Call back ${item.code}`)}
           onPress={() => router.push({ pathname: "/sender", params: { code: item.code } })}
           style={({ pressed }) => [styles.recall, pressed && styles.pressed]}
         >
           <Feather name="phone-call" size={18} color={colors.onBrandPrimary} />
-          <Text style={styles.recallText}>Richiama</Text>
+          <Text style={styles.recallText}>{tr("Richiama", "Call back")}</Text>
         </Pressable>
       ) : null}
     </Animated.View>
@@ -77,6 +78,7 @@ function Row({ item, index, name }: { item: CallRecord; index: number; name?: st
 }
 
 export default function History() {
+  useLang();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [items, setItems] = useState<CallRecord[] | null>(null);
@@ -98,18 +100,18 @@ export default function History() {
   return (
     <View style={styles.root} testID="history-screen">
       <Header
-        title="Storico chiamate"
-        right={items && items.length > 0 ? <IconBtn icon="trash-2" label="Cancella storico" testID="history-clear-button" onPress={() => setConfirm(true)} /> : null}
+        title={tr("Storico chiamate", "Call history")}
+        right={items && items.length > 0 ? <IconBtn icon="trash-2" label={tr("Cancella storico", "Clear history")} testID="history-clear-button" onPress={() => setConfirm(true)} /> : null}
       />
       {confirm && (
         <View style={styles.confirm} testID="history-clear-confirm">
-          <Text style={styles.confirmText}>Cancellare tutto lo storico?</Text>
+          <Text style={styles.confirmText}>{tr("Cancellare tutto lo storico?", "Clear the whole history?")}</Text>
           <View style={styles.confirmRow}>
             <Btn compact testID="history-clear-cancel" label="No" onPress={() => setConfirm(false)} style={styles.flex} />
             <Btn
               compact
               testID="history-clear-yes"
-              label="Cancella"
+              label={tr("Cancella", "Clear")}
               variant="danger"
               style={styles.flex}
               onPress={async () => {
@@ -129,7 +131,8 @@ export default function History() {
             <Pressable testID="history-pro-banner" onPress={() => router.push("/pro")} style={({ pressed }) => [styles.proBanner, pressed && styles.pressed]}>
               <Feather name="lock" size={18} color={colors.brandPrimary} />
               <Text style={styles.proText}>
-                {hidden > 0 ? `Altre ${hidden} chiamate nascoste. ` : ""}Con Pro vedi lo storico completo.
+                {hidden > 0 ? tr(hidden === 1 ? "Un'altra chiamata nascosta. " : `Altre ${hidden} chiamate nascoste. `, hidden === 1 ? "1 more call hidden. " : `${hidden} more calls hidden. `) : ""}
+                {tr("Con Pro vedi lo storico completo.", "Pro shows the full history.")}
               </Text>
               <Feather name="chevron-right" size={20} color={colors.muted} />
             </Pressable>
@@ -141,7 +144,7 @@ export default function History() {
         ListHeaderComponent={
           items && items.length > 0 ? (
             <Text style={styles.summary} testID="history-summary">
-              {items.length} chiamate · {formatDuration(total)} in 3D
+              {tr(`${items.length} ${items.length === 1 ? "chiamata" : "chiamate"} · ${formatDuration(total)} in 3D`, `${items.length} ${items.length === 1 ? "call" : "calls"} · ${formatDuration(total)} in 3D`)}
             </Text>
           ) : undefined
         }
@@ -149,9 +152,9 @@ export default function History() {
           items ? (
             <View style={styles.empty} testID="history-empty">
               <TwoPeople size={140} />
-              <Text style={styles.emptyTitle}>Nessuna chiamata per ora</Text>
-              <Text style={styles.emptyText}>Le chiamate fatte e ricevute compariranno qui, con durata e qualità.</Text>
-              <Btn testID="history-empty-call-button" label="Fai una chiamata" icon="video" variant="primary" onPress={() => router.replace("/sender")} />
+              <Text style={styles.emptyTitle}>{tr("Nessuna chiamata per ora", "No calls yet")}</Text>
+              <Text style={styles.emptyText}>{tr("Le chiamate fatte e ricevute compariranno qui, con durata e qualità.", "Calls you make and receive will appear here, with duration and quality.")}</Text>
+              <Btn testID="history-empty-call-button" label={tr("Fai una chiamata", "Make a call")} icon="video" variant="primary" onPress={() => router.replace("/sender")} />
             </View>
           ) : undefined
         }

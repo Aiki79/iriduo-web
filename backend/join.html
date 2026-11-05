@@ -21,14 +21,22 @@
 </head>
 <body>
 <main>
-  <div class="tag">IRIDUO · CHIAMATA 3D</div>
-  <h1>Sei invitato a una chiamata 3D</h1>
-  <p class="slogan">A tu per tu, in 3D · <em>Face to face, in 3D</em></p>
-  <p>Codice del visore:</p>
+  <div class="tag" id="tag">IRIDUO · CHIAMATA 3D</div>
+  <h1 id="h1">Sei invitato a una chiamata 3D</h1>
+  <p class="slogan" id="slogan">A tu per tu, in 3D</p>
+  <p id="lbl">Codice del visore:</p>
   <div class="code" id="code">{{CODE}}</div>
   <a class="btn" id="open" href="{{APP_URL}}">Apri l'app e chiama</a>
-  <p>Se l'app non si apre, aprila tu, scegli “Trasmetto in VR180” e inserisci il codice qui sopra.</p>
+  <p id="help">Se l'app non si apre, aprila tu, scegli “Chiama con la camera 3D” e inserisci il codice qui sopra.</p>
 </main>
-<script>setTimeout(function(){ location.href = document.getElementById('open').href; }, 300);</script>
+<script>
+// Language of the person opening the link (not of who sent it)
+if (!/^it/i.test(navigator.language || '')) {
+  document.documentElement.lang = 'en';
+  var t = { tag: 'IRIDUO · 3D CALL', h1: "You're invited to a 3D call", slogan: 'Face to face, in 3D', lbl: 'Headset code:', open: 'Open the app and call',
+    help: 'If the app doesn\u2019t open, open it yourself, choose \u201cCall with the 3D camera\u201d and enter the code above.' };
+  for (var k in t) document.getElementById(k).textContent = t[k];
+}
+setTimeout(function(){ location.href = document.getElementById('open').href; }, 300);</script>
 </body>
 </html>

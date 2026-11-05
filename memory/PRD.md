@@ -96,3 +96,10 @@
 - Titolo Home "IriDuo": Iri bianco + Duo sfumato azzurro→viola→rosso con alone e doppia ombra 3D (src/components/GradientTitle.tsx, MaskedView su nativo, background-clip su web)
 - Fix UI: chat con scroll interno che segue solo se sei in fondo, pannello ospiti e rubrica con pulsanti che non si schiacciano
 - Font: Varela Round (titoli), Atkinson Hyperlegible (testi)
+
+## Update: IT/EN (giu 2026)
+- src/i18n.ts tr(it,en) + useLang; language choice at /language on first launch (phone language preselected), switch from Home menu
+- src/gate.ts: language+terms gate in _layout for every route incl. invite links (pending link resumed)
+- stage.html gets ?lang=en (T() helper); join.html by browser language, link preview by sender lang
+- Quick replies localised on receive (CallChat localizeQuick)
+- Home: smaller grey greeting, single-language slogan, renamed cards, compact layout at narrow width/large text

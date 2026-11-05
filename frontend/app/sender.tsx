@@ -20,38 +20,43 @@ import { ChunkReceiver } from "@/src/media";
 import { GuestsPanel } from "@/src/components/GuestsPanel";
 import { blockedCodes, useSafety } from "@/src/components/Safety";
 import { callsLeft, countCall, FREE_REACTIONS, FREE_RESOLUTION, useProState } from "@/src/pro";
+import { tr, useLang } from "@/src/i18n";
 import { colors, fonts, radius, spacing } from "@/src/theme";
 
-const GUEST_MSG: Record<string, string> = {
-  declined: "ha rifiutato",
-  noanswer: "nessuna risposta",
-  failed: "collegamento non riuscito",
-  invalid: "il codice deve avere 6 cifre",
-  duplicate: "è già nella chiamata",
-  full: "massimo 3 visori aggiunti",
-  notLive: "avvia prima la chiamata",
-  ended: "ha chiuso",
-  notfound: "codice non trovato (il visore deve essere aperto)",
-};
+const GUEST_MSG = (s: string) =>
+  ({
+    declined: tr("ha rifiutato", "declined"),
+    noanswer: tr("nessuna risposta", "no answer"),
+    failed: tr("collegamento non riuscito", "connection failed"),
+    invalid: tr("il codice deve avere 6 cifre", "the code must have 6 digits"),
+    duplicate: tr("è già nella chiamata", "is already in the call"),
+    full: tr("massimo 3 visori aggiunti", "3 extra headsets maximum"),
+    notLive: tr("avvia prima la chiamata", "start the call first"),
+    ended: tr("ha chiuso", "hung up"),
+    notfound: tr("codice non trovato (il visore deve essere aperto)", "code not found (the headset must be open)"),
+  })[s] ?? tr("chiamata terminata", "call ended");
 
 const isWeb = Platform.OS === "web";
-const RESOLUTIONS = [
-  { value: "3840x1920", label: "4K · consigliata" },
+const RESOLUTIONS = () => [
+  { value: "3840x1920", label: tr("4K · consigliata", "4K · recommended") },
   { value: "2880x1440", label: "2,9K" },
-  { value: "1920x960", label: "HD · rete lenta" },
+  { value: "1920x960", label: tr("HD · rete lenta", "HD · slow network") },
 ];
-const BITRATES = [
-  { value: 40000000, label: "Alta · 40 Mbit/s" },
-  { value: 20000000, label: "Media · 20 Mbit/s" },
-  { value: 10000000, label: "Bassa · 10 Mbit/s" },
+const BITRATES = () => [
+  { value: 40000000, label: tr("Alta · 40 Mbit/s", "High · 40 Mbit/s") },
+  { value: 20000000, label: tr("Media · 20 Mbit/s", "Medium · 20 Mbit/s") },
+  { value: 10000000, label: tr("Bassa · 10 Mbit/s", "Low · 10 Mbit/s") },
 ];
 const BAR_HEIGHT = 88;
 const LEVELS = [5000000, 10000000, 20000000, 40000000];
+// Stage status texts come in the app language: match both.
+const CAM_READY = /^(Camera pronta|Camera ready)/;
 
 function prettyLabel(l: string) {
   const s = l.toLowerCase();
-  if (s.includes("front")) return "Frontale";
-  if (s.includes("back") || s.includes("rear") || s.includes("environment")) return l.match(/\d+/) ? `Posteriore ${l.match(/\d+/)?.[0]}` : "Posteriore";
+  if (s.includes("front")) return tr("Frontale", "Front");
+  const back = tr("Posteriore", "Back");
+  if (s.includes("back") || s.includes("rear") || s.includes("environment")) return l.match(/\d+/) ? `${back} ${l.match(/\d+/)?.[0]}` : back;
   return l;
 }
 
@@ -72,16 +77,16 @@ function PermissionGate() {
       <View style={styles.gateIcon}>
         <Feather name="video" size={34} color={colors.onBrandPrimary} />
       </View>
-      <Text style={styles.gateTitle}>Camera e microfono</Text>
+      <Text style={styles.gateTitle}>{tr("Camera e microfono", "Camera and microphone")}</Text>
       <Text style={styles.gateText}>
-        Servono per inviare il tuo video 3D e la tua voce al visore. Puoi usare la camera VR180 collegata al telefono o la fotocamera per una prova.
+        {tr("Servono per inviare il tuo video 3D e la tua voce al visore. Puoi usare la camera VR180 collegata al telefono o la fotocamera per una prova.", "They're needed to send your 3D video and your voice to the headset. You can use the VR180 camera connected to the phone, or the phone camera for a test.")}
       </Text>
       {blocked ? (
-        <Btn testID="sender-open-settings-button" label="Apri Impostazioni" icon="settings" variant="primary" onPress={() => Linking.openSettings()} />
+        <Btn testID="sender-open-settings-button" label={tr("Apri Impostazioni", "Open Settings")} icon="settings" variant="primary" onPress={() => Linking.openSettings()} />
       ) : (
         <Btn
           testID="sender-grant-permission-button"
-          label="Consenti camera e microfono"
+          label={tr("Consenti camera e microfono", "Allow camera and microphone")}
           icon="check"
           variant="primary"
           onPress={async () => {
@@ -90,18 +95,19 @@ function PermissionGate() {
           }}
         />
       )}
-      {blocked && <Text style={styles.gateHint}>Hai negato il permesso: abilitalo nelle impostazioni e torna qui.</Text>}
+      {blocked && <Text style={styles.gateHint}>{tr("Hai negato il permesso: abilitalo nelle impostazioni e torna qui.", "You denied the permission: enable it in settings and come back here.")}</Text>}
     </View>
   );
 }
 
 export default function Sender() {
+  useLang();
   const [cam] = useCameraPermissions();
   const [mic] = useMicrophonePermissions();
   const granted = isWeb || (cam?.granted && mic?.granted);
   return (
     <View style={styles.root} testID="sender-screen">
-      <Header title="Trasmissione" />
+      <Header title={tr("Trasmissione", "Broadcast")} />
       {granted ? <SenderBody /> : <PermissionGate />}
     </View>
   );
@@ -125,7 +131,7 @@ function SenderBody() {
   const [code, setCode] = useState("");
   const [recent, setRecent] = useState<string[]>([]);
   const [phase, setPhase] = useState<"idle" | "calling" | "live">("idle");
-  const [status, setStatus] = useState("Avvio della camera…");
+  const [status, setStatus] = useState(tr("Avvio della camera…", "Starting camera…"));
   const [tone, setTone] = useState<"info" | "error" | "success">("info");
   const [resText, setResText] = useState("");
   const [startedAt, setStartedAt] = useState<number | null>(null);
@@ -209,7 +215,7 @@ function SenderBody() {
     if (linkCode && /^\d{6}$/.test(linkCode)) {
       linkRef.current = linkCode;
       setCode(linkCode);
-      setStatus(`Codice ${linkCode} ricevuto dal link: chiamo appena la camera è pronta.`);
+      setStatus(tr(`Codice ${linkCode} ricevuto dal link: chiamo appena la camera è pronta.`, `Code ${linkCode} received from the link: calling as soon as the camera is ready.`));
       setTone("success");
     }
   }, [linkCode]);
@@ -252,11 +258,11 @@ function SenderBody() {
     if (!camReady || !target || autoDoneRef.current || phase !== "idle" || code !== target) return;
     autoDoneRef.current = true;
     if (callsLeft(proState) === 0) {
-      setStatus("Hai finito le chiamate gratuite di questo mese. Passa a Pro per chiamare ancora.");
+      setStatus(tr("Hai finito le chiamate gratuite di questo mese. Passa a Pro per chiamare ancora.", "You've used this month's free calls. Upgrade to Pro to keep calling."));
       setTone("error");
       return;
     }
-    setStatus(`Chiamo automaticamente il visore ${target}…`);
+    setStatus(tr(`Chiamo automaticamente il visore ${target}…`, `Automatically calling headset ${target}…`));
     setTone("info");
     pendingRef.current = { code: target, at: Date.now() };
     addRecentCode(target).then(setRecent);
@@ -282,19 +288,19 @@ function SenderBody() {
           setMicId((m) => (e.mics.find((x) => x.id === m) ? m : e.mic));
           break;
         case "resolution":
-          setResText(`Risoluzione effettiva: ${e.w} × ${e.h}${e.w < e.requested ? " (la camera non supporta quella richiesta)" : ""}`);
+          setResText(tr(`Risoluzione effettiva: ${e.w} × ${e.h}${e.w < e.requested ? " (la camera non supporta quella richiesta)" : ""}`, `Actual resolution: ${e.w} × ${e.h}${e.w < e.requested ? " (the camera doesn't support the requested one)" : ""}`));
           break;
         case "status":
           lastStatusRef.current = e.text;
-          if (e.text.startsWith("Camera pronta")) setCamReady(true);
-          if (linkRef.current && e.text.startsWith("Camera pronta")) {
+          if (CAM_READY.test(e.text)) setCamReady(true);
+          if (linkRef.current && CAM_READY.test(e.text)) {
             if (!autoDoneRef.current) break; // auto call effect sets its own status
-            setStatus(`Camera pronta. Codice ${linkRef.current} ricevuto dal link: tocca Chiama.`);
+            setStatus(tr(`Camera pronta. Codice ${linkRef.current} ricevuto dal link: tocca Chiama.`, `Camera ready. Code ${linkRef.current} received from the link: tap Call.`));
             setTone("success");
             break;
           }
           setStatus(e.text);
-          setTone(/errore|non |negato/i.test(e.text) ? "error" : /collegato/i.test(e.text) ? "success" : "info");
+          setTone(/errore|non |negato|error|not |denied|can't|won't|failed/i.test(e.text) ? "error" : /collegato|connected/i.test(e.text) ? "success" : "info");
           break;
         case "permError":
           setStatus(e.text);
@@ -315,12 +321,12 @@ function SenderBody() {
           }
           break;
         case "chat":
-          setMessages((a) => [...a, newMessage("them", e.text, e.from ? nameFor(contactsRef.current, e.from) ?? `Visore ${e.from}` : undefined)]);
+          setMessages((a) => [...a, newMessage("them", e.text, e.from ? nameFor(contactsRef.current, e.from) ?? tr(`Visore ${e.from}`, `Headset ${e.from}`) : undefined)]);
           break;
         case "recStarted":
           setRecAt(Date.now());
           setRecNow(Date.now());
-          setMediaMsg({ text: "Registrazione in corso (massimo 5 minuti).", tone: "info" });
+          setMediaMsg({ text: tr("Registrazione in corso (massimo 5 minuti).", "Recording (5 minutes max)."), tone: "info" });
           break;
         case "recError":
           setRecAt(null);
@@ -328,15 +334,15 @@ function SenderBody() {
           break;
         case "recSaved":
           setRecAt(null);
-          setMediaMsg({ text: `Registrazione salvata: ${e.name}`, tone: "success" });
+          setMediaMsg({ text: tr(`Registrazione salvata: ${e.name}`, `Recording saved: ${e.name}`), tone: "success" });
           break;
         case "recChunk":
           if (e.i === 0) {
             setRecAt(null);
-            setMediaMsg({ text: "Preparo il video registrato…", tone: "info" });
+            setMediaMsg({ text: tr("Preparo il video registrato…", "Preparing the recorded video…"), tone: "info" });
           }
           receiver.current.push(e.i, e.n, e.name, e.data, e.mime, (ok) =>
-            setMediaMsg(ok ? { text: `Registrazione pronta: ${e.name}`, tone: "success" } : { text: "Non sono riuscito a salvare la registrazione.", tone: "error" }),
+            setMediaMsg(ok ? { text: tr(`Registrazione pronta: ${e.name}`, `Recording ready: ${e.name}`), tone: "success" } : { text: tr("Non sono riuscito a salvare la registrazione.", "Couldn't save the recording."), tone: "error" }),
           );
           break;
         case "guest":
@@ -350,11 +356,11 @@ function SenderBody() {
             return next;
           });
           if (e.state === "promoted") {
-            setMediaMsg({ text: `Il visore principale ha chiuso: continui a trasmettere a ${e.code}.`, tone: "info" });
+            setMediaMsg({ text: tr(`Il visore principale ha chiuso: continui a trasmettere a ${e.code}.`, `The main headset hung up: you keep broadcasting to ${e.code}.`), tone: "info" });
             break;
           }
           if (!["ringing", "connected", "removed"].includes(e.state)) {
-            setMediaMsg({ text: `Visore ${e.code}: ${GUEST_MSG[e.state] ?? "chiamata terminata"}.`, tone: e.state === "ended" ? "info" : "error" });
+            setMediaMsg({ text: `${tr("Visore", "Headset")} ${e.code}: ${GUEST_MSG(e.state)}.`, tone: e.state === "ended" ? "info" : "error" });
           }
           break;
         case "react":
@@ -377,7 +383,7 @@ function SenderBody() {
             addCall({ role: "out", code: p.code, at: c.at, duration: Date.now() - c.at, quality: topQuality(c.counts), result: "completata" });
           } else if (p) {
             const s = lastStatusRef.current;
-            const result: CallResult = /rifiutata/i.test(s) ? "rifiutata" : /nessuna risposta/i.test(s) ? "senza-risposta" : /non trovato/i.test(s) ? "non-trovato" : "annullata";
+            const result: CallResult = /rifiutata|declined|rejected/i.test(s) ? "rifiutata" : /nessuna risposta|no answer/i.test(s) ? "senza-risposta" : /non trovato|not found/i.test(s) ? "non-trovato" : "annullata";
             addCall({ role: "out", code: p.code, at: p.at, duration: 0, quality: null, result });
           }
           callRef.current = null;
@@ -402,13 +408,13 @@ function SenderBody() {
   const call = async (target?: string) => {
     const c = target ?? code;
     if (!/^\d{6}$/.test(c)) {
-      setStatus("Il codice deve avere 6 cifre.");
+      setStatus(tr("Il codice deve avere 6 cifre.", "The code must have 6 digits."));
       setTone("error");
       return;
     }
     if (target) setCode(target);
     if ((await blockedCodes()).includes(c)) {
-      setStatus("Hai bloccato questo codice: non puoi chiamarlo.");
+      setStatus(tr("Hai bloccato questo codice: non puoi chiamarlo.", "You blocked this code: you can't call it."));
       setTone("error");
       return;
     }
@@ -432,7 +438,7 @@ function SenderBody() {
         {phase === "live" && (
           <View style={styles.liveBadge} testID="sender-live-badge">
             <View style={styles.liveDot} />
-            <Text style={styles.liveText}>IN ONDA</Text>
+            <Text style={styles.liveText}>{tr("IN ONDA", "LIVE")}</Text>
           </View>
         )}
         {phase === "live" && startedAt ? (
@@ -466,7 +472,7 @@ function SenderBody() {
             <StatusBox
               testID="sender-auto-quality-notice"
               tone="warning"
-              text={`Qualità automatica: invio ridotto a ${effBitrate / 1e6} Mbit/s per la connessione debole. Risalirà da sola quando migliora.`}
+              text={tr(`Qualità automatica: invio ridotto a ${effBitrate / 1e6} Mbit/s per la connessione debole. Risalirà da sola quando migliora.`, `Auto quality: sending reduced to ${effBitrate / 1e6} Mbit/s because of a weak connection. It will go back up by itself when it improves.`)}
             />
           </View>
         ) : null}
@@ -475,7 +481,7 @@ function SenderBody() {
             guests={guests}
             onAdd={(c) => {
               if (guests[c]) {
-                setMediaMsg({ text: `Visore ${c}: è già nella chiamata.`, tone: "error" });
+                setMediaMsg({ text: tr(`Visore ${c}: è già nella chiamata.`, `Headset ${c}: already in the call.`), tone: "error" });
                 return;
               }
               setGuests((g) => ({ ...g, [c]: "adding" }));
@@ -489,11 +495,11 @@ function SenderBody() {
         ) : null}
         {phase === "live" ? (
           <View style={styles.statsWrap}>
-            <Label>Registrazione</Label>
+            <Label>{tr("Registrazione", "Recording")}</Label>
             <Btn
               compact
               testID="sender-record-button"
-              label={recAt ? `Ferma ${formatDuration(recNow - recAt)}` : pro ? "Registra la tua trasmissione" : "Registra · solo con Pro"}
+              label={recAt ? tr(`Ferma ${formatDuration(recNow - recAt)}`, `Stop ${formatDuration(recNow - recAt)}`) : pro ? tr("Registra la tua trasmissione", "Record your broadcast") : tr("Registra · solo con Pro", "Record · Pro only")}
               icon={recAt ? "stop-circle" : pro ? "circle" : "lock"}
               variant={recAt ? "danger" : "secondary"}
               onPress={() => (!pro ? router.push("/pro") : stage.current?.send({ type: recAt ? "recStop" : "recStart" }))}
@@ -508,7 +514,7 @@ function SenderBody() {
         {phase === "live" ? (
           <View style={styles.statsWrap}>
             {safety.ui}
-            <Label>Reazioni</Label>
+            <Label>{tr("Reazioni", "Reactions")}</Label>
             <ReactionBar onReact={react} testID="sender-reactions" unlocked={pro ? undefined : FREE_REACTIONS} onLocked={() => router.push("/pro")} />
           </View>
         ) : null}
@@ -520,7 +526,7 @@ function SenderBody() {
 
         {!busy && waiting.length > 0 ? (
           <View testID="sender-waiting">
-            <Label>In attesa ora · tocca per chiamare</Label>
+            <Label>{tr("In attesa ora · tocca per chiamare", "Waiting now · tap to call")}</Label>
             <ChipRow testID="sender-waiting-chips">
               {waiting.map((c) => (
                 <Chip key={c} testID={`sender-waiting-${c}`} icon="radio" label={nameFor(contacts, c) ?? c} selected={false} onPress={() => call(c)} />
@@ -528,12 +534,12 @@ function SenderBody() {
             </ChipRow>
           </View>
         ) : null}
-        <Label>Codice mostrato sul visore</Label>
+        <Label>{tr("Codice mostrato sul visore", "Code shown on the headset")}</Label>
         <TextInput
           testID="sender-code-input"
           value={code}
           onChangeText={(t) => setCode(t.replace(/\D/g, "").slice(0, 6))}
-          placeholder="6 cifre"
+          placeholder={tr("6 cifre", "6 digits")}
           placeholderTextColor={colors.muted}
           keyboardType="number-pad"
           maxLength={6}
@@ -561,28 +567,28 @@ function SenderBody() {
         <View style={[styles.warn]} testID="sender-camera-warning">
           <Feather name="alert-triangle" size={18} color={colors.warning} />
           <Text style={styles.warnText}>
-            La camera VR180 deve inviare l’immagine già unita (due metà affiancate). Collegala al telefono come webcam USB, oppure usa la fotocamera per una prova.
+            {tr("La camera VR180 deve inviare l’immagine già unita (due metà affiancate). Collegala al telefono come webcam USB, oppure usa la fotocamera per una prova.", "The VR180 camera must send the image already joined (two halves side by side). Connect it to the phone as a USB webcam, or use the phone camera for a test.")}
           </Text>
         </View>
 
         <View pointerEvents={busy ? "none" : "auto"} style={busy && styles.dim}>
           <Label>Camera</Label>
           <ChipRow testID="sender-camera-chips">
-            {cams.length === 0 && <Text style={styles.small}>Ricerca camere…</Text>}
+            {cams.length === 0 && <Text style={styles.small}>{tr("Ricerca camere…", "Looking for cameras…")}</Text>}
             {cams.map((c, i) => (
               <Chip key={c.id} testID={`sender-camera-chip-${i}`} icon="camera" label={prettyLabel(c.label)} selected={camId === c.id} onPress={() => setCamId(c.id)} />
             ))}
           </ChipRow>
-          <Label>Microfono</Label>
+          <Label>{tr("Microfono", "Microphone")}</Label>
           <ChipRow testID="sender-mic-chips">
-            {mics.length === 0 && <Text style={styles.small}>Ricerca microfoni…</Text>}
+            {mics.length === 0 && <Text style={styles.small}>{tr("Ricerca microfoni…", "Looking for microphones…")}</Text>}
             {mics.map((m, i) => (
               <Chip key={m.id} testID={`sender-mic-chip-${i}`} icon="mic" label={m.label} selected={micId === m.id} onPress={() => setMicId(m.id)} />
             ))}
           </ChipRow>
-          <Label>Risoluzione</Label>
+          <Label>{tr("Risoluzione", "Resolution")}</Label>
           <ChipRow testID="sender-resolution-chips">
-            {RESOLUTIONS.map((r) => (
+            {RESOLUTIONS().map((r) => (
               <Chip
                 key={r.value}
                 testID={`sender-resolution-${r.value}`}
@@ -594,16 +600,16 @@ function SenderBody() {
             ))}
           </ChipRow>
         </View>
-        <Label>Qualità di invio</Label>
+        <Label>{tr("Qualità di invio", "Sending quality")}</Label>
         <ChipRow testID="sender-bitrate-chips">
-          {BITRATES.map((b) => (
+          {BITRATES().map((b) => (
             <Chip key={b.value} testID={`sender-bitrate-${b.value}`} label={b.label} selected={bitrate === b.value} onPress={() => setBitrate(b.value)} />
           ))}
         </ChipRow>
         <Toggle
           testID="sender-auto-quality-toggle"
-          label="Qualità automatica"
-          hint="Abbassa l’invio se la connessione è debole, poi lo rialza"
+          label={tr("Qualità automatica", "Auto quality")}
+          hint={tr("Abbassa l’invio se la connessione è debole, poi lo rialza", "Lowers sending when the connection is weak, then raises it again")}
           value={autoQ}
           onChange={setAutoQ}
         />
@@ -613,13 +619,13 @@ function SenderBody() {
         {busy ? (
           <Btn
             testID="sender-hangup-button"
-            label={phase === "calling" ? "Annulla chiamata" : "Chiudi chiamata"}
+            label={phase === "calling" ? tr("Annulla chiamata", "Cancel call") : tr("Chiudi chiamata", "End call")}
             icon="phone-off"
             variant="danger"
             onPress={() => stage.current?.send({ type: "hangup" })}
           />
         ) : (
-          <Btn testID="sender-call-button" label="Chiama" icon="phone-call" variant="primary" disabled={!valid} onPress={() => call()} />
+          <Btn testID="sender-call-button" label={tr("Chiama", "Call")} icon="phone-call" variant="primary" disabled={!valid} onPress={() => call()} />
         )}
       </KeyboardStickyView>
     </View>

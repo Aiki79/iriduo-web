@@ -4,6 +4,7 @@ import { StyleSheet, Text, View } from "react-native";
 import Animated, { Easing, FadeOut, useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming, ZoomIn } from "react-native-reanimated";
 import { MaterialDesignIcons } from "@react-native-vector-icons/material-design-icons";
 
+import { tr } from "@/src/i18n";
 import { colors, fonts } from "@/src/theme";
 
 const ART = require("../../assets/images/splash-image.png"); // the two people from the app icon
@@ -17,7 +18,7 @@ export function TwoPeople({ size = 160, testID }: { size?: number; testID?: stri
   const style = useAnimatedStyle(() => ({ transform: [{ translateY: y.value }] }));
   return (
     <Animated.View style={style} testID={testID}>
-      <Image source={ART} style={{ width: size, height: size }} contentFit="contain" accessibilityLabel="Due persone che si parlano in 3D" />
+      <Image source={ART} style={{ width: size, height: size }} contentFit="contain" accessibilityLabel={tr("Due persone che si parlano in 3D", "Two people talking in 3D")} />
     </Animated.View>
   );
 }
@@ -40,7 +41,7 @@ export function Avatar({ name, size = 44 }: { name: string; size?: number }) {
 
 export function greeting(d = new Date()) {
   const h = d.getHours();
-  return h < 5 ? "Buonanotte" : h < 13 ? "Buongiorno" : h < 18 ? "Buon pomeriggio" : "Buonasera";
+  return h < 5 ? tr("Buonanotte", "Good night") : h < 13 ? tr("Buongiorno", "Good morning") : h < 18 ? tr("Buon pomeriggio", "Good afternoon") : tr("Buonasera", "Good evening");
 }
 
 /** Big heart that pops and fades: shown once, at the first successful call. */
@@ -48,7 +49,7 @@ export function HeartBurst({ testID }: { testID?: string }) {
   return (
     <Animated.View entering={ZoomIn.springify().damping(9)} exiting={FadeOut.duration(500)} style={styles.burst} pointerEvents="none" testID={testID}>
       <MaterialDesignIcons name="heart" size={120} color={colors.accent} />
-      <Text style={styles.burstText}>Prima chiamata in 3D!</Text>
+      <Text style={styles.burstText}>{tr("Prima chiamata in 3D!", "First 3D call!")}</Text>
     </Animated.View>
   );
 }

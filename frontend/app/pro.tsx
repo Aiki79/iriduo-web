@@ -5,17 +5,19 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Btn, Header } from "@/src/components/ui";
 import { activatePro, callsLeft, deactivatePro, FREE_HD_CALLS, PLANS, useProState, type Plan } from "@/src/pro";
+import { tr, useLang } from "@/src/i18n";
 import { colors, fonts, radius, spacing } from "@/src/theme";
 
-const FEATURES: { icon: "monitor" | "clock" | "heart" | "camera" | "phone-call"; free: string; pro: string }[] = [
-  { icon: "phone-call", free: `${FREE_HD_CALLS} chiamate al mese`, pro: "Chiamate illimitate" },
-  { icon: "monitor", free: "Solo qualità HD", pro: "Qualità 4K e 2,9K" },
-  { icon: "clock", free: "Storico: ultime 3 chiamate", pro: "Storico completo" },
-  { icon: "heart", free: "3 reazioni", pro: "Tutte le reazioni" },
-  { icon: "camera", free: "Niente foto 3D né registrazioni", pro: "Foto 3D e registrazioni" },
+const FEATURES = (): { icon: "monitor" | "clock" | "heart" | "camera" | "phone-call"; free: string; pro: string }[] => [
+  { icon: "phone-call", free: tr(`${FREE_HD_CALLS} chiamate al mese`, `${FREE_HD_CALLS} calls a month`), pro: tr("Chiamate illimitate", "Unlimited calls") },
+  { icon: "monitor", free: tr("Solo qualità HD", "HD quality only"), pro: tr("Qualità 4K e 2,9K", "4K and 2.9K quality") },
+  { icon: "clock", free: tr("Storico: ultime 3 chiamate", "History: last 3 calls"), pro: tr("Storico completo", "Full history") },
+  { icon: "heart", free: tr("3 reazioni", "3 reactions"), pro: tr("Tutte le reazioni", "All reactions") },
+  { icon: "camera", free: tr("Niente foto 3D né registrazioni", "No 3D photos or recordings"), pro: tr("Foto 3D e registrazioni", "3D photos and recordings") },
 ];
 
 export default function ProScreen() {
+  useLang();
   const insets = useSafeAreaInsets();
   const s = useProState();
   const [plan, setPlan] = useState<Plan>("annual");
@@ -27,27 +29,29 @@ export default function ProScreen() {
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.xl }]}>
         <View style={styles.demo} testID="pro-demo-banner">
           <Feather name="info" size={18} color={colors.warning} />
-          <Text style={styles.demoText}>Modalità prova: nessun pagamento reale. Il Pro si attiva solo su questo telefono, per vedere come funziona.</Text>
+          <Text style={styles.demoText}>{tr("Modalità prova: nessun pagamento reale. Il Pro si attiva solo su questo telefono, per vedere come funziona.", "Trial mode: no real payment. Pro is activated only on this phone, to see how it works.")}</Text>
         </View>
 
         {s.pro ? (
           <View style={styles.active} testID="pro-active">
             <Feather name="check-circle" size={28} color={colors.success} />
-            <Text style={styles.activeTitle}>Pro attivo (prova)</Text>
-            <Text style={styles.activeText}>Piano {s.plan === "annual" ? "annuale · 59,99 € / anno" : "mensile · 6,99 € / mese"}</Text>
+            <Text style={styles.activeTitle}>{tr("Pro attivo (prova)", "Pro active (trial)")}</Text>
+            <Text style={styles.activeText}>{s.plan === "annual" ? tr("Piano annuale · 59,99 € / anno", "Yearly plan · €59.99 / year") : tr("Piano mensile · 6,99 € / mese", "Monthly plan · €6.99 / month")}</Text>
           </View>
         ) : (
           <Text style={styles.left} testID="pro-calls-left">
-            Ti restano {callsLeft(s)} chiamate gratuite questo mese.
+            {callsLeft(s) === 1
+              ? tr("Ti resta 1 chiamata gratuita questo mese.", "You have 1 free call left this month.")
+              : tr(`Ti restano ${callsLeft(s)} chiamate gratuite questo mese.`, `You have ${callsLeft(s)} free calls left this month.`)}
           </Text>
         )}
 
         <View style={styles.table}>
           <View style={styles.tRow}>
-            <Text style={[styles.tHead, styles.flex]}>Gratis</Text>
+            <Text style={[styles.tHead, styles.flex]}>{tr("Gratis", "Free")}</Text>
             <Text style={[styles.tHead, styles.flex, styles.proHead]}>Pro</Text>
           </View>
-          {FEATURES.map((f) => (
+          {FEATURES().map((f) => (
             <View key={f.icon} style={styles.tRow}>
               <Text style={[styles.tCell, styles.flex]}>{f.free}</Text>
               <View style={[styles.flex, styles.proCell]}>
@@ -59,7 +63,7 @@ export default function ProScreen() {
         </View>
 
         {!s.pro &&
-          PLANS.map((p) => (
+          PLANS().map((p) => (
             <Pressable
               key={p.id}
               testID={`pro-plan-${p.id}`}
@@ -78,16 +82,16 @@ export default function ProScreen() {
           ))}
 
         {s.pro ? (
-          <Btn testID="pro-deactivate-button" label="Torna al piano gratuito" icon="x-circle" onPress={deactivatePro} />
+          <Btn testID="pro-deactivate-button" label={tr("Torna al piano gratuito", "Back to the free plan")} icon="x-circle" onPress={deactivatePro} />
         ) : confirm ? (
           <View style={styles.confirm} testID="pro-confirm">
-            <Text style={styles.confirmText}>Attivare il Pro in prova? Non viene addebitato nulla.</Text>
+            <Text style={styles.confirmText}>{tr("Attivare il Pro in prova? Non viene addebitato nulla.", "Activate the Pro trial? Nothing will be charged.")}</Text>
             <View style={styles.row}>
-              <Btn compact testID="pro-confirm-cancel" label="Annulla" onPress={() => setConfirm(false)} style={styles.flex} />
+              <Btn compact testID="pro-confirm-cancel" label={tr("Annulla", "Cancel")} onPress={() => setConfirm(false)} style={styles.flex} />
               <Btn
                 compact
                 testID="pro-confirm-yes"
-                label="Attiva"
+                label={tr("Attiva", "Activate")}
                 variant="primary"
                 style={styles.flex}
                 onPress={() => {
@@ -98,7 +102,7 @@ export default function ProScreen() {
             </View>
           </View>
         ) : (
-          <Btn testID="pro-activate-button" label="Prova il Pro" icon="star" variant="primary" onPress={() => setConfirm(true)} />
+          <Btn testID="pro-activate-button" label={tr("Prova il Pro", "Try Pro")} icon="star" variant="primary" onPress={() => setConfirm(true)} />
         )}
       </ScrollView>
     </View>

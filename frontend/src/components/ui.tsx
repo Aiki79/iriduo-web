@@ -4,6 +4,7 @@ import type { ComponentProps, ReactNode } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View, type StyleProp, type ViewStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { tr } from "@/src/i18n";
 import { colors, fonts, radius, spacing } from "@/src/theme";
 
 export type IconName = ComponentProps<typeof Feather>["name"];
@@ -121,7 +122,7 @@ export function Header({ title, right }: { title: string; right?: ReactNode }) {
   const insets = useSafeAreaInsets();
   return (
     <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
-      <IconBtn icon="arrow-left" label="Indietro" testID="header-back-button" onPress={() => (router.canGoBack() ? router.back() : router.replace("/"))} />
+      <IconBtn icon="arrow-left" label={tr("Indietro", "Back")} testID="header-back-button" onPress={() => (router.canGoBack() ? router.back() : router.replace("/"))} />
       <Text style={styles.headerTitle} numberOfLines={1}>
         {title}
       </Text>

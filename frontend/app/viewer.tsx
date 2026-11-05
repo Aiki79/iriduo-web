@@ -25,14 +25,15 @@ import { addCall, topQuality } from "@/src/history";
 import { ShareCode } from "@/src/components/ShareCode";
 import type { StageEvent, StageHandle } from "@/src/components/stage-types";
 import { Btn, Chip, ChipRow, Header, IconBtn, Label, StatusBox, Toggle, type IconName } from "@/src/components/ui";
+import { tr, useLang } from "@/src/i18n";
 import { colors, fonts, radius, spacing } from "@/src/theme";
 
 type Phase = "connecting" | "waiting" | "incoming" | "answering" | "connected" | "error";
 const isWeb = Platform.OS === "web";
-const DEMOS: { id: string; label: string; icon: IconName }[] = [
-  { id: "sfere", label: "Sfere fluttuanti", icon: "circle" },
-  { id: "tunnel", label: "Tunnel di luce", icon: "target" },
-  { id: "stelle", label: "Cielo e scritta 3D", icon: "star" },
+const DEMOS = (): { id: string; label: string; icon: IconName }[] => [
+  { id: "sfere", label: tr("Sfere fluttuanti", "Floating spheres"), icon: "circle" },
+  { id: "tunnel", label: tr("Tunnel di luce", "Light tunnel"), icon: "target" },
+  { id: "stelle", label: tr("Cielo e scritta 3D", "Sky and 3D text"), icon: "star" },
 ];
 
 function PulsingAnswer({ onPress }: { onPress: () => void }) {
@@ -43,12 +44,14 @@ function PulsingAnswer({ onPress }: { onPress: () => void }) {
   const style = useAnimatedStyle(() => ({ transform: [{ scale: s.value }] }));
   return (
     <Animated.View style={[styles.flex, style]}>
-      <Btn testID="viewer-answer-button" label="Rispondi" icon="phone" variant="success" onPress={onPress} />
+      <Btn testID="viewer-answer-button" label={tr("Rispondi", "Answer")} icon="phone" variant="success" onPress={onPress} />
     </Animated.View>
   );
 }
 
 export default function Viewer() {
+  useLang();
+  const demos = DEMOS();
   const insets = useSafeAreaInsets();
   const stage = useRef<StageHandle>(null);
   const { photo, video } = useLocalSearchParams<{ photo?: string; video?: string }>();
@@ -70,7 +73,7 @@ export default function Viewer() {
     if (v && codeRef.current) storage.setItem("fixed_code", codeRef.current);
   };
   const [code, setCode] = useState<string | null>(null);
-  const [status, setStatus] = useState("Collegamento al server…");
+  const [status, setStatus] = useState(tr("Collegamento al server…", "Connecting to the server…"));
   const [phase, setPhase] = useState<Phase>("connecting");
   const [format, setFormatState] = useState<"sbs" | "tb" | "fisheye">("sbs");
   // the chosen layout is remembered on this headset (the ELP user doesn't have to pick it every time)
@@ -212,10 +215,10 @@ export default function Viewer() {
           send({ type: "setMotion", on: motion });
           send({ type: "feGuide", on: guide && format === "fisheye" });
           if (video && !isWeb) {
-            setMediaMsg({ text: "Carico la registrazione…", tone: "info" });
+            setMediaMsg({ text: tr("Carico la registrazione…", "Loading recording…"), tone: "info" });
             sendVideoFile(video, (c) => send(c))
-              .then(() => setMediaMsg({ text: `Registrazione: ${video}`, tone: "success" }))
-              .catch(() => setMediaMsg({ text: "Non riesco ad aprire la registrazione.", tone: "error" }));
+              .then(() => setMediaMsg({ text: tr(`Registrazione: ${video}`, `Recording: ${video}`), tone: "success" }))
+              .catch(() => setMediaMsg({ text: tr("Non riesco ad aprire la registrazione.", "Can't open the recording."), tone: "error" }));
           }
           if (photo && !isWeb) {
             readMemoryBase64(photo)
@@ -225,7 +228,7 @@ export default function Viewer() {
                 setFormatState(f);
                 send({ type: "showImage", data, name: photo });
               })
-              .catch(() => setMediaMsg({ text: "Non riesco ad aprire la foto.", tone: "error" }));
+              .catch(() => setMediaMsg({ text: tr("Non riesco ad aprire la foto.", "Can't open the photo."), tone: "error" }));
           }
           break;
         case "code":
@@ -235,7 +238,7 @@ export default function Viewer() {
           if (fixedOnRef.current) storage.setItem("fixed_code", e.code);
           break;
         case "codeTaken":
-          setMediaMsg({ text: "Il tuo codice fisso era occupato: ne ho creato uno nuovo e l’ho memorizzato.", tone: "info" });
+          setMediaMsg({ text: tr("Il tuo codice fisso era occupato: ne ho creato uno nuovo e l’ho memorizzato.", "Your fixed code was taken: a new one was created and saved."), tone: "info" });
           break;
         case "status":
           setStatus(e.text);
@@ -275,13 +278,13 @@ export default function Viewer() {
           incomingRef.current = false;
           break;
         case "chat":
-          setMessages((a) => [...a, newMessage("them", e.text, e.from ? `Visore ${e.from}` : undefined)]);
+          setMessages((a) => [...a, newMessage("them", e.text, e.from ? tr(`Visore ${e.from}`, `Headset ${e.from}`) : undefined)]);
           if (!isWeb) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           break;
         case "snapshot":
           if (!isWeb) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          setMediaMsg({ text: `Foto 3D pronta: ${e.name}`, tone: "success" });
-          if (e.data) saveAndShare(e.name, e.data, "image/jpeg").catch(() => setMediaMsg({ text: "Non sono riuscito a salvare la foto.", tone: "error" }));
+          setMediaMsg({ text: tr(`Foto 3D pronta: ${e.name}`, `3D photo ready: ${e.name}`), tone: "success" });
+          if (e.data) saveAndShare(e.name, e.data, "image/jpeg").catch(() => setMediaMsg({ text: tr("Non sono riuscito a salvare la foto.", "Couldn't save the photo."), tone: "error" }));
           break;
         case "snapError":
         case "recError":
@@ -291,19 +294,19 @@ export default function Viewer() {
         case "recStarted":
           setRecAt(Date.now());
           setRecNow(Date.now());
-          setMediaMsg({ text: "Registrazione in corso (massimo 5 minuti).", tone: "info" });
+          setMediaMsg({ text: tr("Registrazione in corso (massimo 5 minuti).", "Recording (5 minutes max)."), tone: "info" });
           break;
         case "recSaved":
           setRecAt(null);
-          setMediaMsg({ text: `Registrazione salvata: ${e.name}`, tone: "success" });
+          setMediaMsg({ text: tr(`Registrazione salvata: ${e.name}`, `Recording saved: ${e.name}`), tone: "success" });
           break;
         case "recChunk":
           if (e.i === 0) {
             setRecAt(null);
-            setMediaMsg({ text: "Preparo il video registrato…", tone: "info" });
+            setMediaMsg({ text: tr("Preparo il video registrato…", "Preparing the recorded video…"), tone: "info" });
           }
           receiver.current.push(e.i, e.n, e.name, e.data, e.mime, (ok) =>
-            setMediaMsg(ok ? { text: `Registrazione pronta: ${e.name}`, tone: "success" } : { text: "Non sono riuscito a salvare la registrazione.", tone: "error" }),
+            setMediaMsg(ok ? { text: tr(`Registrazione pronta: ${e.name}`, `Recording ready: ${e.name}`), tone: "success" } : { text: tr("Non sono riuscito a salvare la registrazione.", "Couldn't save the recording."), tone: "error" }),
           );
           break;
         case "react":
@@ -411,10 +414,10 @@ export default function Viewer() {
       <StatusBar hidden={full} style="light" />
       {!full && (
         <Header
-          title="Visore"
+          title={tr("Visore", "Headset")}
           right={
             phase === "waiting" || phase === "error" ? (
-              <IconBtn icon="refresh-cw" label="Nuovo codice" testID="viewer-new-code-button" onPress={() => send({ type: "newCode" })} />
+              <IconBtn icon="refresh-cw" label={tr("Nuovo codice", "New code")} testID="viewer-new-code-button" onPress={() => send({ type: "newCode" })} />
             ) : null
           }
         />
@@ -423,7 +426,7 @@ export default function Viewer() {
       {!full && (
         <View style={styles.top}>
           <View style={styles.codeCard}>
-            <Text style={styles.codeLabel}>Comunica questo codice a chi ti chiama</Text>
+            <Text style={styles.codeLabel}>{tr("Comunica questo codice a chi ti chiama", "Give this code to the person calling you")}</Text>
             <Text style={styles.code} testID="viewer-code" selectable>
               {code ?? "······"}
             </Text>
@@ -435,7 +438,7 @@ export default function Viewer() {
             <Animated.View entering={FadeIn} style={styles.incoming} testID="viewer-incoming">
               <PulsingAnswer onPress={answer} />
               <View style={styles.flex}>
-                <Btn testID="viewer-decline-button" label="Rifiuta" icon="x" variant="danger" onPress={() => {
+                <Btn testID="viewer-decline-button" label={tr("Rifiuta", "Decline")} icon="x" variant="danger" onPress={() => {
                     declinedRef.current = true;
                     send({ type: "decline" });
                   }}
@@ -445,12 +448,12 @@ export default function Viewer() {
           )}
           {phase === "incoming" && micBlocked && (
             <View style={styles.micRow}>
-              <Text style={styles.small}>Microfono bloccato: l’altra persona non ti sentirà.</Text>
-              <Btn compact testID="viewer-open-settings-button" label="Apri Impostazioni" onPress={() => Linking.openSettings()} />
+              <Text style={styles.small}>{tr("Microfono bloccato: l’altra persona non ti sentirà.", "Microphone blocked: the other person won't hear you.")}</Text>
+              <Btn compact testID="viewer-open-settings-button" label={tr("Apri Impostazioni", "Open Settings")} onPress={() => Linking.openSettings()} />
             </View>
           )}
           {phase === "error" && (
-            <Btn testID="viewer-retry-button" label="Riprova" icon="refresh-cw" variant="primary" onPress={() => stage.current?.reload()} />
+            <Btn testID="viewer-retry-button" label={tr("Riprova", "Retry")} icon="refresh-cw" variant="primary" onPress={() => stage.current?.reload()} />
           )}
         </View>
       )}
@@ -470,17 +473,17 @@ export default function Viewer() {
         ) : null}
         {full ? (
           <View style={[styles.fullBar, { top: Math.max(insets.top, spacing.md), left: Math.max(insets.left, spacing.md), right: Math.max(insets.right, spacing.md) }]}>
-            <IconBtn icon="minimize-2" label="Esci da schermo intero" testID="viewer-exit-fullscreen-button" onPress={() => setFull(false)} />
+            <IconBtn icon="minimize-2" label={tr("Esci da schermo intero", "Exit full screen")} testID="viewer-exit-fullscreen-button" onPress={() => setFull(false)} />
             {startedAt && phase === "connected" ? <CallPill startedAt={startedAt} stats={stats} testID="viewer-call-pill" /> : null}
             <View style={styles.row}>
-              {motion && <IconBtn icon="crosshair" label="Ricentra" testID="viewer-recenter-fullscreen-button" onPress={() => send({ type: "recenter" })} />}
+              {motion && <IconBtn icon="crosshair" label={tr("Ricentra", "Recenter")} testID="viewer-recenter-fullscreen-button" onPress={() => send({ type: "recenter" })} />}
               {phase === "connected" && (
-                <IconBtn icon="camera" label="Foto 3D" testID="viewer-snapshot-fullscreen-button" onPress={snap} />
+                <IconBtn icon="camera" label={tr("Foto 3D", "3D photo")} testID="viewer-snapshot-fullscreen-button" onPress={snap} />
               )}
               {phase === "connected" && (
                 <IconBtn
                   icon={recAt ? "stop-circle" : "circle"}
-                  label={recAt ? "Ferma registrazione" : "Registra"}
+                  label={recAt ? tr("Ferma registrazione", "Stop recording") : tr("Registra", "Record")}
                   testID="viewer-record-fullscreen-button"
                   onPress={rec}
                 />
@@ -488,19 +491,19 @@ export default function Viewer() {
               {phase === "connected" && (
                 <IconBtn
                   icon={composerOpen ? "x" : "message-circle"}
-                  label={composerOpen ? "Chiudi messaggi" : "Messaggi"}
+                  label={composerOpen ? tr("Chiudi messaggi", "Close messages") : tr("Messaggi", "Messages")}
                   testID="viewer-chat-fullscreen-button"
                   onPress={() => setComposerOpen((o) => !o)}
                 />
               )}
               {inCall && (
-                <IconBtn icon="phone-off" label="Chiudi chiamata" testID="viewer-hangup-fullscreen-button" onPress={() => send({ type: "hangup" })} />
+                <IconBtn icon="phone-off" label={tr("Chiudi chiamata", "End call")} testID="viewer-hangup-fullscreen-button" onPress={() => send({ type: "hangup" })} />
               )}
             </View>
           </View>
         ) : (
           <View style={styles.stageBtn}>
-            <IconBtn icon="maximize-2" label="Schermo intero" testID="viewer-fullscreen-button" onPress={() => setFull(true)} />
+            <IconBtn icon="maximize-2" label={tr("Schermo intero", "Full screen")} testID="viewer-fullscreen-button" onPress={() => setFull(true)} />
           </View>
         )}
         {full && composerOpen && phase === "connected" ? (
@@ -510,7 +513,7 @@ export default function Viewer() {
             <View style={styles.fullComposerInner} testID="viewer-fullscreen-composer">
               {messages.slice(-3).map((m) => (
                 <Text key={m.id} style={[styles.fullMsg, m.from === "me" && styles.fullMsgMe]} numberOfLines={2}>
-                  {m.from === "me" ? "Tu: " : ""}
+                  {m.from === "me" ? tr("Tu: ", "You: ") : ""}
                   {m.text}
                 </Text>
               ))}
@@ -530,7 +533,7 @@ export default function Viewer() {
         >
           {inCall && (
             <>
-              <Btn testID="viewer-hangup-button" label="Chiudi chiamata" icon="phone-off" variant="danger" onPress={() => send({ type: "hangup" })} style={styles.mt} />
+              <Btn testID="viewer-hangup-button" label={tr("Chiudi chiamata", "End call")} icon="phone-off" variant="danger" onPress={() => send({ type: "hangup" })} style={styles.mt} />
               {safety.ui}
             </>
           )}
@@ -539,16 +542,16 @@ export default function Viewer() {
               <CallStatsCard startedAt={startedAt} stats={stats} direction="in" testID="viewer-call-stats" />
             </View>
           ) : null}
-          {phase === "connected" || (testing && DEMOS.some((d) => d.id === testing)) ? (
+          {phase === "connected" || (testing && demos.some((d) => d.id === testing)) ? (
             <View style={styles.mt}>
-              <Label>Ricordi 3D</Label>
+              <Label>{tr("Ricordi 3D", "3D memories")}</Label>
               <View style={styles.row}>
-                <Btn compact testID="viewer-snapshot-button" label={pro ? "Foto 3D" : "Foto 3D · Pro"} icon={pro ? "camera" : "lock"} onPress={snap} style={styles.flex} />
+                <Btn compact testID="viewer-snapshot-button" label={pro ? tr("Foto 3D", "3D photo") : tr("Foto 3D · Pro", "3D photo · Pro")} icon={pro ? "camera" : "lock"} onPress={snap} style={styles.flex} />
                 {phase === "connected" ? (
                   <Btn
                     compact
                     testID="viewer-record-button"
-                    label={recAt ? `Ferma ${formatDuration(recNow - recAt)}` : pro ? "Registra" : "Registra · Pro"}
+                    label={recAt ? tr(`Ferma ${formatDuration(recNow - recAt)}`, `Stop ${formatDuration(recNow - recAt)}`) : pro ? tr("Registra", "Record") : tr("Registra · Pro", "Record · Pro")}
                     icon={recAt ? "stop-circle" : pro ? "circle" : "lock"}
                     variant={recAt ? "danger" : "secondary"}
                     onPress={rec}
@@ -565,7 +568,7 @@ export default function Viewer() {
           ) : null}
           {phase === "connected" ? (
             <View style={styles.mt}>
-              <Label>Reazioni nella scena 3D</Label>
+              <Label>{tr("Reazioni nella scena 3D", "Reactions in the 3D scene")}</Label>
               <ReactionBar onReact={react} testID="viewer-reactions" unlocked={pro ? undefined : FREE_REACTIONS} onLocked={goPro} />
             </View>
           ) : null}
@@ -573,51 +576,51 @@ export default function Viewer() {
 
           <Toggle
             testID="viewer-fixed-code-toggle"
-            label="Tieni sempre questo codice"
-            hint="Così i tuoi contatti non devono aggiornarlo. Il codice cambia solo se tocchi Nuovo codice."
+            label={tr("Tieni sempre questo codice", "Always keep this code")}
+            hint={tr("Così i tuoi contatti non devono aggiornarlo. Il codice cambia solo se tocchi Nuovo codice.", "So your contacts don't have to update it. The code changes only if you tap New code.")}
             value={!!fixedOn}
             onChange={toggleFixed}
           />
-          <Label>Come guardare</Label>
+          <Label>{tr("Come guardare", "How to watch")}</Label>
           <ChipRow testID="viewer-view-chips">
-            <Chip testID="viewer-view-drag-chip" icon="move" label="Con il dito" selected={view === "drag"} onPress={() => chooseView("drag")} />
-            <Chip testID="viewer-view-split-chip" icon="columns" label="Schermo diviso" selected={view === "split"} onPress={() => chooseView("split")} />
+            <Chip testID="viewer-view-drag-chip" icon="move" label={tr("Con il dito", "With your finger")} selected={view === "drag"} onPress={() => chooseView("drag")} />
+            <Chip testID="viewer-view-split-chip" icon="columns" label={tr("Schermo diviso", "Split screen")} selected={view === "split"} onPress={() => chooseView("split")} />
           </ChipRow>
           {view === "split" && (
             <View style={styles.tip} testID="viewer-split-tip">
               <Feather name="smartphone" size={20} color={colors.brandPrimary} />
-              <Text style={styles.tipText}>Metti il telefono in orizzontale dentro un visore tipo Cardboard, poi tocca Schermo intero.</Text>
+              <Text style={styles.tipText}>{tr("Metti il telefono in orizzontale dentro un visore tipo Cardboard, poi tocca Schermo intero.", "Put the phone sideways inside a Cardboard-style headset, then tap Full screen.")}</Text>
             </View>
           )}
-          {view === "split" && <Btn testID="viewer-split-fullscreen-button" label="Schermo intero" icon="maximize" variant="primary" onPress={() => setFull(true)} style={styles.mt} />}
+          {view === "split" && <Btn testID="viewer-split-fullscreen-button" label={tr("Schermo intero", "Full screen")} icon="maximize" variant="primary" onPress={() => setFull(true)} style={styles.mt} />}
 
           <Toggle
             testID="viewer-motion-toggle"
-            label="Muovi il telefono per guardarti intorno"
-            hint={isWeb ? "Disponibile nell'app sul telefono" : "Usa i sensori di movimento del telefono"}
+            label={tr("Muovi il telefono per guardarti intorno", "Move the phone to look around")}
+            hint={isWeb ? tr("Disponibile nell'app sul telefono", "Available in the phone app") : tr("Usa i sensori di movimento del telefono", "Uses the phone's motion sensors")}
             value={motion}
             onChange={(v) => !isWeb && setMotion(v)}
           />
-          {motion && <Btn compact testID="viewer-recenter-button" label="Ricentra la vista" icon="crosshair" onPress={() => send({ type: "recenter" })} style={styles.mt} />}
+          {motion && <Btn compact testID="viewer-recenter-button" label={tr("Ricentra la vista", "Recenter the view")} icon="crosshair" onPress={() => send({ type: "recenter" })} style={styles.mt} />}
           {motionDenied && (
             <View style={styles.micRow}>
-              <Text style={styles.small}>Permesso movimento negato: puoi usare il dito.</Text>
-              <Btn compact testID="viewer-motion-settings-button" label="Apri Impostazioni" onPress={() => Linking.openSettings()} />
+              <Text style={styles.small}>{tr("Permesso movimento negato: puoi usare il dito.", "Motion permission denied: you can use your finger.")}</Text>
+              <Btn compact testID="viewer-motion-settings-button" label={tr("Apri Impostazioni", "Open Settings")} onPress={() => Linking.openSettings()} />
             </View>
           )}
           <Text style={[styles.small, styles.mt]} testID="viewer-xr-note">
             {xrOk
-              ? "Visore rilevato: tocca \"Entra nel visore 3D\" in basso nell'anteprima per vedere davvero in 3D."
-              : "Visore con telefono (Cardboard, VR Box…): scegli \"Schermo diviso\" e metti a schermo intero. Visori autonomi (Meta Quest, Pico, Apple Vision Pro…) e visori per PC: apri IriDuo nel browser del visore e tocca \"Entra nel visore 3D\"."}
+              ? tr("Visore rilevato: tocca \"Entra nel visore 3D\" in basso nell'anteprima per vedere davvero in 3D.", "Headset detected: tap \"Enter the 3D headset\" at the bottom of the preview to see in real 3D.")
+              : tr("Visore con telefono (Cardboard, VR Box…): scegli \"Schermo diviso\" e metti a schermo intero. Visori autonomi (Meta Quest, Pico, Apple Vision Pro…) e visori per PC: apri IriDuo nel browser del visore e tocca \"Entra nel visore 3D\".", "Phone headset (Cardboard, VR Box…): choose \"Split screen\" and go full screen. Standalone headsets (Meta Quest, Pico, Apple Vision Pro…) and PC headsets: open IriDuo in the headset browser and tap \"Enter the 3D headset\".")}
           </Text>
 
-          <Label>Formato video</Label>
+          <Label>{tr("Formato video", "Video format")}</Label>
           <ChipRow testID="viewer-format-chips">
-            <Chip testID="viewer-format-sbs-chip" label="Affiancate (VR180 standard)" selected={format === "sbs"} onPress={() => setFormat("sbs")} />
-            <Chip testID="viewer-format-tb-chip" label="Una sopra l'altra" selected={format === "tb"} onPress={() => setFormat("tb")} />
+            <Chip testID="viewer-format-sbs-chip" label={tr("Affiancate (VR180 standard)", "Side by side (standard VR180)")} selected={format === "sbs"} onPress={() => setFormat("sbs")} />
+            <Chip testID="viewer-format-tb-chip" label={tr("Una sopra l'altra", "Top and bottom")} selected={format === "tb"} onPress={() => setFormat("tb")} />
           </ChipRow>
           <ChipRow testID="viewer-format-fisheye-row">
-            <Chip wide testID="viewer-format-fisheye-chip" label="Due cerchi fisheye affiancati (camera ELP)" selected={format === "fisheye"} onPress={() => setFormat("fisheye")} />
+            <Chip wide testID="viewer-format-fisheye-chip" label={tr("Due cerchi fisheye affiancati (camera ELP)", "Two side-by-side fisheye circles (ELP camera)")} selected={format === "fisheye"} onPress={() => setFormat("fisheye")} />
           </ChipRow>
           {format === "fisheye" && (
             <FisheyePanel
@@ -634,12 +637,12 @@ export default function Viewer() {
               }}
             />
           )}
-          <Toggle testID="viewer-swap-toggle" label="Scambia occhio sinistro e destro" value={swap} onChange={setSwap} />
+          <Toggle testID="viewer-swap-toggle" label={tr("Scambia occhio sinistro e destro", "Swap left and right eye")} value={swap} onChange={setSwap} />
 
-          <Label>Prova senza chiamata</Label>
-          <Text style={styles.small}>Scegli una demo 3D già pronta, oppure carica un video VR180 salvato sul telefono.</Text>
+          <Label>{tr("Prova senza chiamata", "Try without a call")}</Label>
+          <Text style={styles.small}>{tr("Scegli una demo 3D già pronta, oppure carica un video VR180 salvato sul telefono.", "Pick a ready-made 3D demo, or load a VR180 video saved on the phone.")}</Text>
           <ChipRow testID="viewer-demo-chips">
-            {DEMOS.map((d) => (
+            {demos.map((d) => (
               <Chip
                 key={d.id}
                 testID={`viewer-demo-${d.id}-chip`}
@@ -650,18 +653,18 @@ export default function Viewer() {
               />
             ))}
           </ChipRow>
-          {testing && DEMOS.some((d) => d.id === testing) ? (
-            <Btn compact testID="viewer-demo-stop-button" label="Ferma la demo" icon="square" onPress={() => send({ type: "stopDemo" })} style={styles.mt} />
+          {testing && demos.some((d) => d.id === testing) ? (
+            <Btn compact testID="viewer-demo-stop-button" label={tr("Ferma la demo", "Stop the demo")} icon="square" onPress={() => send({ type: "stopDemo" })} style={styles.mt} />
           ) : null}
           <Btn
             testID="viewer-test-video-button"
-            label={testOpen ? "Annulla" : "Video dal telefono"}
+            label={testOpen ? tr("Annulla", "Cancel") : tr("Video dal telefono", "Video from phone")}
             icon={testOpen ? "x" : "film"}
             disabled={inCall}
             onPress={() => setTestOpen((o) => !o)}
             style={styles.mt}
           />
-          {testOpen && <Text style={[styles.small, styles.mt]}>Tocca il riquadro nella scena qui sopra per scegliere il video.</Text>}
+          {testOpen && <Text style={[styles.small, styles.mt]}>{tr("Tocca il riquadro nella scena qui sopra per scegliere il video.", "Tap the box in the scene above to choose the video.")}</Text>}
         </KeyboardAwareScrollView>
       )}
       {heart ? <HeartBurst testID="viewer-heart" /> : null}

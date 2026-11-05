@@ -3,10 +3,11 @@ import { useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { Label } from "@/src/components/ui";
+import { tr } from "@/src/i18n";
 import { nameFor, type Contact } from "@/src/contacts";
 import { colors, fonts, radius, spacing } from "@/src/theme";
 
-const STATE_LABEL: Record<string, string> = { adding: "Chiamo…", ringing: "Squilla…", connected: "Sta guardando" };
+const STATE_LABEL = (s: string) => ({ adding: tr("Chiamo…", "Calling…"), ringing: tr("Squilla…", "Ringing…"), connected: tr("Sta guardando", "Watching") })[s] ?? s;
 
 /** Invite up to 3 more viewers to watch the same live broadcast. */
 export function GuestsPanel({ guests, onAdd, onRemove, names, online = [] }: { guests: Record<string, string>; onAdd: (code: string) => void; onRemove: (code: string) => void; names: Contact[]; online?: string[] }) {
@@ -27,8 +28,8 @@ export function GuestsPanel({ guests, onAdd, onRemove, names, online = [] }: { g
 
   return (
     <View style={styles.panel} testID="sender-guests">
-      <Label>Altri visori ({list.length}/3)</Label>
-      <Text style={styles.hint}>Invita fino a 3 persone in più a guardare la stessa trasmissione 3D.</Text>
+      <Label>{tr(`Altri visori (${list.length}/3)`, `More headsets (${list.length}/3)`)}</Label>
+      <Text style={styles.hint}>{tr("Invita fino a 3 persone in più a guardare la stessa trasmissione 3D.", "Invite up to 3 more people to watch the same 3D broadcast.")}</Text>
       {list.map(([c, s]) => (
         <View key={c} style={styles.row} testID={`sender-guest-${c}`}>
           <View style={[styles.dot, { backgroundColor: s === "connected" ? colors.success : colors.warning }]} />
@@ -37,10 +38,10 @@ export function GuestsPanel({ guests, onAdd, onRemove, names, online = [] }: { g
               {nameFor(names, c) ?? c}
             </Text>
             <Text style={styles.state} testID={`sender-guest-state-${c}`}>
-              {STATE_LABEL[s] ?? s}
+              {STATE_LABEL(s)}
             </Text>
           </View>
-          <Pressable testID={`sender-guest-remove-${c}`} accessibilityLabel="Togli dalla chiamata" onPress={() => onRemove(c)} style={({ pressed }) => [styles.remove, pressed && styles.pressed]}>
+          <Pressable testID={`sender-guest-remove-${c}`} accessibilityLabel={tr("Togli dalla chiamata", "Remove from call")} onPress={() => onRemove(c)} style={({ pressed }) => [styles.remove, pressed && styles.pressed]}>
             <Feather name="x" size={18} color={colors.onError} />
           </Pressable>
         </View>
@@ -65,7 +66,7 @@ export function GuestsPanel({ guests, onAdd, onRemove, names, online = [] }: { g
               testID="sender-guest-code-input"
               value={code}
               onChangeText={(t) => setCode(t.replace(/\D/g, "").slice(0, 6))}
-              placeholder="Codice di un altro visore"
+              placeholder={tr("Codice di un altro visore", "Another headset's code")}
               placeholderTextColor={colors.muted}
               keyboardType="number-pad"
               maxLength={6}
@@ -73,7 +74,7 @@ export function GuestsPanel({ guests, onAdd, onRemove, names, online = [] }: { g
               onSubmitEditing={add}
               style={styles.input}
             />
-            <Pressable testID="sender-guest-add-button" accessibilityLabel="Invita" onPress={add} disabled={!valid} style={({ pressed }) => [styles.add, !valid && styles.disabled, pressed && styles.pressed]}>
+            <Pressable testID="sender-guest-add-button" accessibilityLabel={tr("Invita", "Invite")} onPress={add} disabled={!valid} style={({ pressed }) => [styles.add, !valid && styles.disabled, pressed && styles.pressed]}>
               <Feather name="user-plus" size={20} color={colors.onBrandPrimary} />
             </Pressable>
           </View>

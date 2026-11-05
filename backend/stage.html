@@ -37,6 +37,8 @@ const PREFISSO = 'vr180chiamata-';
 let codiceFisso = (new URLSearchParams(location.search).get('fixed') || '').match(/^\d{6}$/) ? new URLSearchParams(location.search).get('fixed') : null;
 const MODE = new URLSearchParams(location.search).get('mode') || 'viewer';
 const $ = id => document.getElementById(id);
+const EN = new URLSearchParams(location.search).get('lang') === 'en';
+const T = (it, en) => EN ? en : it;  // app language, passed by the app as ?lang=
 
 /* ---------- ponte con l'app ---------- */
 function send(o){
@@ -45,7 +47,7 @@ function send(o){
   else if (window.parent !== window) window.parent.postMessage(s, location.origin);
 }
 const handlers = {};
-window.app = { cmd(c){ const h = handlers[c && c.type]; if (h) { try { h(c); } catch (e) { send({ type:'status', text:'Errore: ' + e.message }); } } } };
+window.app = { cmd(c){ const h = handlers[c && c.type]; if (h) { try { h(c); } catch (e) { send({ type:'status', text:T('Errore: ', "Error: ") + e.message }); } } } };
 addEventListener('message', e => {
   if (e.origin !== location.origin || e.source !== window.parent) return;
   let c = e.data;
@@ -53,6 +55,7 @@ addEventListener('message', e => {
   if (c && c.__cmd) window.app.cmd(c);
 });
 const stato = t => send({ type:'status', text:t });
+if (EN) { document.documentElement.lang = 'en'; $('hint').textContent = 'Waiting for video…'; $('vr').textContent = 'Enter the 3D headset'; $('file').querySelector('label').firstChild.textContent = 'Tap here to choose a VR180 video'; }
 const hint = (t) => { $('hint').hidden = !t; if (t) $('hint').textContent = t; };
 
 /* =================== STATISTICHE =================== */
@@ -140,7 +143,7 @@ const COL = ['#5CC8E0', '#E0605C', '#E0A85C', '#5CE093', '#EAF0F7'];
 const rnd = (() => { let x = 7; return () => (x = (x * 16807) % 2147483647) / 2147483647; })();
 const stelle = Array.from({ length: 260 }, () => ({ x: rnd(), y: rnd(), z: 6 + rnd() * 6, r: 0.6 + rnd() * 1.6 }));
 const sfere = Array.from({ length: 34 }, (_, i) => ({ x: rnd(), y: 0.2 + rnd() * 0.6, z: 1 + rnd() * 4, c: COL[i % 5], v: (rnd() - 0.5) * 0.03, f: rnd() * 6 }));
-const DEMO_NOMI = { sfere: 'Sfere fluttuanti', tunnel: 'Tunnel di luce', stelle: 'Cielo e scritta 3D' };
+const DEMO_NOMI = { sfere: T('Sfere fluttuanti', "Floating spheres"), tunnel: T('Tunnel di luce', "Light tunnel"), stelle: T('Cielo e scritta 3D', "Sky and 3D text") };
 
 function texAttuale(){ return demo ? demoTex : texture; }
 
@@ -197,7 +200,7 @@ function disegnaOcchio(ctx, w, h, t, s){
     ctx.fillText('VR180', w / 2 + s * K / z1 / 2, h * 0.47);
     ctx.font = `bold ${Math.round(w * 0.05)}px system-ui, sans-serif`;
     ctx.fillStyle = '#EAF0F7';
-    ctx.fillText('Chiamata 3D', w / 2 + s * K / 3 / 2, h * 0.6);
+    ctx.fillText(T('Chiamata 3D', "3D call"), w / 2 + s * K / 3 / 2, h * 0.6);
   }
 }
 
@@ -218,19 +221,19 @@ function disegnaDemo(t){
 function fermaDemo(){ if (!demo) return; demo = null; costruisciSfere(); }
 
 handlers.demo = c => {
-  if (chiamataV) { stato('Chiudi prima la chiamata per provare una demo.'); return; }
+  if (chiamataV) { stato(T('Chiudi prima la chiamata per provare una demo.', "End the call first to try a demo.")); return; }
   if (!DEMO_NOMI[c.name]) return;
   video.pause(); video.srcObject = null; video.removeAttribute('src'); video.load();
   $('file').hidden = true;
   demo = c.name; preparaDemo(); costruisciSfere(); mostraMedia(true); hint(null);
-  stato('Demo 3D: ' + DEMO_NOMI[c.name] + '. Guardati intorno.');
+  stato(T('Demo 3D: ', "3D demo: ") + DEMO_NOMI[c.name] + T('. Guardati intorno.', ". Look around."));
   send({ type:'test', name: c.name });
 };
 handlers.stopDemo = () => {
   if (!demo) return;
-  fermaDemo(); mostraMedia(false); hint('In attesa del video…');
+  fermaDemo(); mostraMedia(false); hint(T('In attesa del video…', "Waiting for video…"));
   send({ type:'test', name: null });
-  stato('In attesa di chiamata.');
+  stato(T('In attesa di chiamata.', "Waiting for a call."));
 };
 
 /* Regolazioni fisheye: restano solo su questo visore (localStorage), non vengono trasmesse */
@@ -333,11 +336,11 @@ function preparaVR(){
       if (renderer.xr.isPresenting) { await renderer.xr.getSession().end(); return; }
       if (video.paused && (video.srcObject || video.src)) video.play().catch(() => {});
       const sess = await navigator.xr.requestSession('immersive-vr', { optionalFeatures: ['local-floor'] });
-      sess.addEventListener('end', () => { b.textContent = 'Entra nel visore 3D'; send({ type: 'xr', on: false }); });
+      sess.addEventListener('end', () => { b.textContent = T('Entra nel visore 3D', "Enter the 3D headset"); send({ type: 'xr', on: false }); });
       await renderer.xr.setSession(sess);
-      b.textContent = 'Esci dal visore';
+      b.textContent = T('Esci dal visore', "Exit the headset");
       send({ type: 'xr', on: true });
-    } catch (e) { stato('Impossibile entrare nel visore: ' + (e && e.message || e)); }
+    } catch (e) { stato(T('Impossibile entrare nel visore: ', "Can't enter the headset: ") + (e && e.message || e)); }
   };
 }
 
@@ -401,7 +404,7 @@ function disegnaGuida(){
     gctx.setLineDash([]);
     gctx.beginPath(); gctx.moveTo(x - 12, y); gctx.lineTo(x + 12, y); gctx.moveTo(x, y - 12); gctx.lineTo(x, y + 12); gctx.stroke();
     gctx.fillStyle = col; gctx.font = 'bold 13px sans-serif'; gctx.textAlign = 'center';
-    gctx.fillText(occhio === 0 ? 'Occhio sinistro' : 'Occhio destro', x, Math.min(ch - 28, y + r + 18));  // sotto: in alto a destra c'è il pulsante schermo intero
+    gctx.fillText(occhio === 0 ? T('Occhio sinistro', "Left eye") : T('Occhio destro', "Right eye"), x, Math.min(ch - 28, y + r + 18));  // sotto: in alto a destra c'è il pulsante schermo intero
   }
   gctx.strokeStyle = 'rgba(255,255,255,.35)'; gctx.setLineDash([4, 6]);
   gctx.beginPath(); gctx.moveTo(ox, oy + H * k / 2); gctx.lineTo(ox + W * k, oy + H * k / 2); gctx.stroke();  // orizzonte comune
@@ -409,7 +412,7 @@ function disegnaGuida(){
 }
 handlers.resetFisheye = () => { fe = { ...FE_BASE }; salvaFe(); costruisciSfere(); send({ type:'fisheye', value: fe }); };
 handlers.showImage = c => {
-  if (chiamataV) { stato('Chiudi prima la chiamata per guardare una foto.'); return; }
+  if (chiamataV) { stato(T('Chiudi prima la chiamata per guardare una foto.', "End the call first to view a photo.")); return; }
   const img = new Image();
   img.onload = () => {
     video.pause(); video.srcObject = null; video.removeAttribute('src'); video.load();
@@ -419,10 +422,10 @@ handlers.showImage = c => {
     if (demoTex) demoTex.dispose();
     demoTex = new THREE.CanvasTexture(demoCanvas); demoTex.colorSpace = THREE.SRGBColorSpace;
     demo = 'foto'; costruisciSfere(); mostraMedia(true); hint(null);
-    stato('Foto 3D: ' + String(c.name || '') + '. Guardati intorno.');
+    stato(T('Foto 3D: ', "3D photo: ") + String(c.name || '') + T('. Guardati intorno.', ". Look around."));
     send({ type:'test', name: 'foto' });
   };
-  img.onerror = () => stato('Non riesco ad aprire la foto.');
+  img.onerror = () => stato(T('Non riesco ad aprire la foto.', "Can't open the photo."));
   img.src = 'data:image/jpeg;base64,' + String(c.data || '');
 };
 handlers.setSwap = c => { scambia = !!c.on; costruisciSfere(); };
@@ -443,14 +446,14 @@ function inviaPari(o){ const dc = canalePari(); if (dc && dc.open) { try { dc.se
 let attesaConsenso = null, devPari = '', sospeso = false;
 // sospensione automatica (3 segnalazioni da utenti diversi): controllata dal server, senza intervento manuale
 const eSospeso = dev => dev ? fetch('suspended/' + dev).then(r => r.ok ? r.json() : {}).then(j => !!j.suspended).catch(() => false) : Promise.resolve(false);
-eSospeso(DEVICE).then(v => { sospeso = v; if (v) { send({ type:'suspended' }); stato('Account sospeso per segnalazioni di altri utenti: non puoi fare né ricevere chiamate.'); } });
+eSospeso(DEVICE).then(v => { sospeso = v; if (v) { send({ type:'suspended' }); stato(T('Account sospeso per segnalazioni di altri utenti: non puoi fare né ricevere chiamate.', "Account suspended after reports from other users: you can't make or receive calls.")); } });
 function datiSicurezza(d){
   if (!d) return;
   if (d.t === 'hello' && /^[a-z0-9]{12,40}$/.test(String(d.dev || ''))) devPari = String(d.dev);
   if (d.t === 'recAsk') send({ type:'recAsk' });
   if (d.t === 'recAns') {
     clearTimeout(attesaConsenso); attesaConsenso = null;
-    if (d.ok) avviaRec(); else send({ type:'recError', text:"L'altra persona non ha dato il consenso alla registrazione." });
+    if (d.ok) avviaRec(); else send({ type:'recError', text:T("L'altra persona non ha dato il consenso alla registrazione.", "The other person did not consent to recording.") });
   }
   if (d.t === 'recOn' || d.t === 'recOff') send({ type:'recPeer', on: d.t === 'recOn' });
 }
@@ -460,7 +463,7 @@ handlers.block = () => {
   const dev = devDi(chiamataV || attesa);
   if (dev && !bloccati.includes(dev)) { bloccati = [dev, ...bloccati].slice(0, 200); localStorage.setItem('bloccati', JSON.stringify(bloccati)); }
   if (chiamataV) chiudiV(); else if (attesa) handlers.decline();
-  msgDopoCodice = 'Utente bloccato: non potrà più chiamarti. Ho creato anche un nuovo codice.';
+  msgDopoCodice = T('Utente bloccato: non potrà più chiamarti. Ho creato anche un nuovo codice.', "User blocked: they can't call you anymore. A new code was created too.");
   rigeneraCodice();
   send({ type:'blocked' });
 };
@@ -478,10 +481,10 @@ function avviaPeerVisore(){
   const rnd32 = new Uint32Array(1); crypto.getRandomValues(rnd32);
   const codice = codiceFisso || String(100000 + (rnd32[0] % 900000));
   peerV = new Peer(PREFISSO + codice);
-  peerV.on('open', () => { send({ type:'code', code: codice }); stato(msgDopoCodice || 'In attesa di chiamata.'); msgDopoCodice = null; });
+  peerV.on('open', () => { send({ type:'code', code: codice }); stato(msgDopoCodice || T('In attesa di chiamata.', "Waiting for a call.")); msgDopoCodice = null; });
   peerV.on('error', e => {
     if (e.type === 'unavailable-id') { if (codiceFisso) { codiceFisso = null; send({ type:'codeTaken' }); } peerV.destroy(); avviaPeerVisore(); }
-    else if (e.type !== 'peer-unavailable') { send({ type:'error', text:'Errore di collegamento (' + e.type + ').' }); }
+    else if (e.type !== 'peer-unavailable') { send({ type:'error', text:T('Errore di collegamento (', "Connection error (") + e.type + ').' }); }
   });
   const questoPeer = peerV;
   peerV.on('disconnected', () => { if (peerV === questoPeer && !questoPeer.destroyed) questoPeer.reconnect(); });
@@ -506,16 +509,16 @@ function avviaPeerVisore(){
       c.close(); if (attesa) { attesa.close(); attesa = null; }
       chiamateRecenti = [];
       send({ type:'ended' });
-      msgDopoCodice = 'Troppe chiamate in poco tempo: per sicurezza ho creato un nuovo codice.';
+      msgDopoCodice = T('Troppe chiamate in poco tempo: per sicurezza ho creato un nuovo codice.', "Too many calls in a short time: a new code was created for safety.");
       stato(msgDopoCodice);
       rigeneraCodice(); return;
     }
     if (sospeso || bloccati.includes(devDi(c))) { c.close(); return; }   // utente bloccato o account sospeso
-    eSospeso(devDi(c)).then(v => { if (v && (attesa === c || chiamataV === c)) { if (chiamataV === c) chiudiV(); else { attesa.close(); attesa = null; send({ type:'ended' }); } stato('Chiamata rifiutata: l\'account che chiamava è sospeso.'); } });
+    eSospeso(devDi(c)).then(v => { if (v && (attesa === c || chiamataV === c)) { if (chiamataV === c) chiudiV(); else { attesa.close(); attesa = null; send({ type:'ended' }); } stato(T('Chiamata rifiutata: l\'account che chiamava è sospeso.', "Call rejected: the caller's account is suspended.")); } });
     if (chiamataV || attesa) { c.close(); return; }
     attesa = c;
     send({ type:'incoming' });
-    stato('Chiamata in arrivo.');
+    stato(T('Chiamata in arrivo.', "Incoming call."));
   });
 }
 
@@ -528,19 +531,19 @@ function rigeneraCodice(){
   if (vecchio) vecchio.destroy();
   avviaPeerVisore();
 }
-handlers.newCode = () => { if (chiamataV) return; send({ type:'ended' }); stato('Nuovo codice in arrivo…'); rigeneraCodice(); };
+handlers.newCode = () => { if (chiamataV) return; send({ type:'ended' }); stato(T('Nuovo codice in arrivo…', "New code coming…")); rigeneraCodice(); };
 
 function annullata(peer){
   if (!attesa || attesa.peer !== peer) return;
   attesa.close(); attesa = null;
   send({ type:'ended' });
-  stato('Chiamata annullata da chi chiamava. In attesa di chiamata.');
+  stato(T('Chiamata annullata da chi chiamava. In attesa di chiamata.', "Call cancelled by the caller. Waiting for a call."));
 }
 
 handlers.answer = async () => {
   if (!attesa) return;
   try { micV = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true } }); }
-  catch { micV = null; stato('Microfono non disponibile: l\'altra persona non ti sentirà.'); }
+  catch { micV = null; stato(T('Microfono non disponibile: l\'altra persona non ti sentirà.', "Microphone unavailable: the other person won't hear you.")); }
   if (!attesa) { if (micV) micV.getTracks().forEach(t => t.stop()); micV = null; return; }
   const c = attesa; attesa = null; chiamataV = c;
   fermaDemo();
@@ -549,14 +552,14 @@ handlers.answer = async () => {
   const pcV = c.peerConnection;
   if (pcV) pcV.addEventListener('connectionstatechange', () => {
     if (chiamataV !== c) return;
-    if (pcV.connectionState === 'connected') { send({ type:'connected' }); stato('Collegato: sei in chiamata 3D.'); avviaStats(pcV, 'in'); }
+    if (pcV.connectionState === 'connected') { send({ type:'connected' }); stato(T('Collegato: sei in chiamata 3D.', "Connected: you're in a 3D call.")); avviaStats(pcV, 'in'); }
     if (pcV.connectionState === 'failed' || pcV.connectionState === 'closed') chiudiV();
   });
   c.on('stream', s => {
     video.removeAttribute('src');
     video.srcObject = s; video.muted = false;
-    hint('Collegamento video…');
-    video.play().catch(() => { if (chiamataV === c) hint('Tocca la scena per avviare il video'); });
+    hint(T('Collegamento video…', "Connecting video…"));
+    video.play().catch(() => { if (chiamataV === c) hint(T('Tocca la scena per avviare il video', "Tap the scene to start the video")); });
   });
   c.on('close', chiudiV); c.on('error', chiudiV);
 };
@@ -570,9 +573,9 @@ function chiudiV(){
   micV = null; video.srcObject = null;
   video.removeAttribute('src'); video.load();
   mostraMedia(false);
-  hint('In attesa del video…');
+  hint(T('In attesa del video…', "Waiting for video…"));
   send({ type:'ended' });
-  stato('Chiamata terminata. In attesa di chiamata.');
+  stato(T('Chiamata terminata. In attesa di chiamata.', "Call ended. Waiting for a call."));
 }
 handlers.hangup = () => { if (chiamataV) chiudiV(); };
 handlers.decline = () => {
@@ -581,18 +584,18 @@ handlers.decline = () => {
     if (dc && dc.open) dc.send({ t:'decline' }); else { const pr = attesa.peer; rifiutiInSospeso.add(pr); setTimeout(() => rifiutiInSospeso.delete(pr), 5000); }
     attesa.close(); attesa = null;
   }
-  send({ type:'ended' }); stato('Chiamata rifiutata. In attesa di chiamata.'); };
+  send({ type:'ended' }); stato(T('Chiamata rifiutata. In attesa di chiamata.', "Call declined. Waiting for a call.")); };
 
 $('fileProva').onchange = e => {
   const f = e.target.files[0]; if (!f) return;
   $('file').hidden = true;
-  if (chiamataV) { stato('Chiudi prima la chiamata per provare un video.'); return; }
+  if (chiamataV) { stato(T('Chiudi prima la chiamata per provare un video.', "End the call first to try a video.")); return; }
   fermaDemo();
   video.srcObject = null;
   mostraMedia(false);
   video.src = URL.createObjectURL(f); video.loop = true; video.muted = false;
-  video.play().then(() => stato('Video di prova in riproduzione: ' + f.name))
-             .catch(() => { hint('Tocca la scena per avviare il video'); stato('Video caricato: tocca la scena per avviarlo.'); });
+  video.play().then(() => stato(T('Video di prova in riproduzione: ', "Test video playing: ") + f.name))
+             .catch(() => { hint(T('Tocca la scena per avviare il video', "Tap the scene to start the video")); stato(T('Video caricato: tocca la scena per avviarlo.', "Video loaded: tap the scene to start it.")); });
   send({ type:'test', name: f.name });
 };
 
@@ -604,13 +607,13 @@ let attivo = { cam:null, mic:null, res:null };
 async function avviaTrasmissione(){
   canvas = $('stage'); canvas.hidden = true;
   $('anteprima').hidden = false;
-  hint('Avvio della camera…');
+  hint(T('Avvio della camera…', "Starting camera…"));
   try {
     const tmp = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
     tmp.getTracks().forEach(t => t.stop());
   } catch {
-    hint('Permesso camera negato');
-    send({ type:'permError', text:'Permesso per camera e microfono negato: abilitalo nelle impostazioni.' });
+    hint(T('Permesso camera negato', "Camera permission denied"));
+    send({ type:'permError', text:T('Permesso per camera e microfono negato: abilitalo nelle impostazioni.', "Camera and microphone permission denied: enable it in settings.") });
     return;
   }
   await elenca();
@@ -621,7 +624,7 @@ async function avviaTrasmissione(){
 async function elenca(){
   const d = await navigator.mediaDevices.enumerateDevices();
   const cams = d.filter(x => x.kind === 'videoinput').map((x, i) => ({ id: x.deviceId, label: x.label || 'Camera ' + (i + 1) }));
-  const mics = d.filter(x => x.kind === 'audioinput').map((x, i) => ({ id: x.deviceId, label: x.label || 'Microfono ' + (i + 1) }));
+  const mics = d.filter(x => x.kind === 'audioinput').map((x, i) => ({ id: x.deviceId, label: x.label || T('Microfono ', "Microphone ") + (i + 1) }));
   if (!cams.find(c => c.id === cfg.cam)) cfg.cam = cams[0] ? cams[0].id : '';
   if (!mics.find(m => m.id === cfg.mic)) cfg.mic = mics[0] ? mics[0].id : '';
   send({ type:'devices', cams, mics, cam: cfg.cam, mic: cfg.mic });
@@ -636,14 +639,14 @@ async function avviaAnteprima(){
       video: { ...(cfg.cam ? { deviceId: { exact: cfg.cam } } : {}), width: { ideal: w }, height: { ideal: h }, frameRate: { ideal: 30 } },
       audio: cfg.mic ? { deviceId: { exact: cfg.mic }, echoCancellation: true } : true
     });
-  } catch (e) { streamLocale = null; stato('La camera non si avvia: ' + e.message); return; }
+  } catch (e) { streamLocale = null; stato(T('La camera non si avvia: ', "The camera won't start: ") + e.message); return; }
   const vt = streamLocale.getVideoTracks()[0];
   vt.contentHint = 'detail';
   $('anteprima').srcObject = streamLocale;
   hint(null);
   const s = vt.getSettings();
   send({ type:'resolution', w: s.width, h: s.height, requested: w });
-  stato('Camera pronta. Inserisci il codice del visore.');
+  stato(T('Camera pronta. Inserisci il codice del visore.', "Camera ready. Enter the headset code."));
 }
 
 handlers.config = c => {
@@ -664,13 +667,13 @@ function impostaBitrate(pc, bps){
 }
 
 handlers.call = async c => {
-  if (sospeso) { stato('Account sospeso per segnalazioni di altri utenti: non puoi fare chiamate.'); return; }
+  if (sospeso) { stato(T('Account sospeso per segnalazioni di altri utenti: non puoi fare chiamate.', "Account suspended after reports from other users: you can't make calls.")); return; }
   const codice = String(c.code || '').trim();
   codicePrimario = codice;
-  if (!/^\d{6}$/.test(codice)) { stato('Il codice deve avere 6 cifre.'); send({ type:'ended' }); return; }
-  if (!streamLocale) { stato('Avvia prima la camera.'); send({ type:'ended' }); return; }
+  if (!/^\d{6}$/.test(codice)) { stato(T('Il codice deve avere 6 cifre.', "The code must have 6 digits.")); send({ type:'ended' }); return; }
+  if (!streamLocale) { stato(T('Avvia prima la camera.', "Start the camera first.")); send({ type:'ended' }); return; }
   send({ type:'calling' });
-  stato('Chiamata in corso…');
+  stato(T('Chiamata in corso…', "Calling…"));
   try {
     if (!peerS || peerS.destroyed) {
       peerS = new Peer();
@@ -680,10 +683,10 @@ handlers.call = async c => {
           const codeErr = m && m[1];
           if (codeErr && ospiti[codeErr]) { togliOspite(codeErr, 'notfound'); return; }
           if (chiamataS && codeErr && codeErr !== codicePrimario) return;
-        } else if (chiamataS && chiamataS.open && Object.keys(ospiti).length) { stato('Errore di collegamento (' + e.type + ').'); return; }
+        } else if (chiamataS && chiamataS.open && Object.keys(ospiti).length) { stato(T('Errore di collegamento (', "Connection error (") + e.type + ').'); return; }
         stato(e.type === 'peer-unavailable'
-          ? 'Codice non trovato: controlla che il visore mostri lo stesso codice.'
-          : 'Errore di collegamento (' + e.type + ').');
+          ? T('Codice non trovato: controlla che il visore mostri lo stesso codice.', "Code not found: check that the headset shows the same code.")
+          : T('Errore di collegamento (', "Connection error (") + e.type + ').');
         fineS();
       });
       await new Promise((ok, ko) => {
@@ -693,7 +696,7 @@ handlers.call = async c => {
     }
   } catch (e) {
     if (e && e.message === 'timeout') {
-      stato('Il server di collegamento non risponde: riprova tra poco.');
+      stato(T('Il server di collegamento non risponde: riprova tra poco.', "The connection server isn't responding: try again shortly."));
       if (peerS) peerS.destroy();
       fineS();
     }
@@ -701,14 +704,14 @@ handlers.call = async c => {
   }
   canaleS = peerS.connect(PREFISSO + codice, { metadata: { dev: DEVICE } });
   canaleS.on('data', d => {
-    if (d && d.t === 'decline') { stato('Chiamata rifiutata dal visore.'); fineS(); }
+    if (d && d.t === 'decline') { stato(T('Chiamata rifiutata dal visore.', "Call declined by the headset.")); fineS(); }
     if (d && d.t === 'chat' && chiamataS) { const text = String(d.text || '').slice(0, 300); send({ type:'chat', text, from: codicePrimario }); inoltra(canaleS, text, codicePrimario); }
     if (d && d.t === 'react' && chiamataS) reazioneRicevuta(String(d.kind));
     if (chiamataS) datiSicurezza(d);
   });
   chiamataS = peerS.call(PREFISSO + codice, streamLocale, { metadata: { dev: DEVICE } });
-  stato('Squilla: attendi che risponda dal visore.');
-  timerSquillo = setTimeout(() => { if (chiamataS) { stato('Nessuna risposta dal visore.'); annullaS(); } }, 45000);
+  stato(T('Squilla: attendi che risponda dal visore.', "Ringing: wait for the headset to answer."));
+  timerSquillo = setTimeout(() => { if (chiamataS) { stato(T('Nessuna risposta dal visore.', "No answer from the headset.")); annullaS(); } }, 45000);
   const pc = chiamataS.peerConnection;
   pc.addEventListener('connectionstatechange', () => {
     if (pc.connectionState === 'connected') {
@@ -716,9 +719,9 @@ handlers.call = async c => {
       impostaBitrate(pc, Number(cfg.bitrate));
       avviaStats(pc, 'out');
       send({ type:'connected' });
-      stato('Collegato: sei in onda in 3D.');
+      stato(T('Collegato: sei in onda in 3D.', "Connected: you're live in 3D."));
     }
-    if (pc.connectionState === 'failed') { stato('Collegamento non riuscito: la rete potrebbe bloccare la connessione diretta.'); fineS(); }
+    if (pc.connectionState === 'failed') { stato(T('Collegamento non riuscito: la rete potrebbe bloccare la connessione diretta.', "Connection failed: the network may be blocking direct connections.")); fineS(); }
   });
   chiamataS.on('stream', r => { $('audioRemoto').srcObject = r; $('audioRemoto').play().catch(() => {}); });
   sorvegliaPrimaria(chiamataS);
@@ -772,7 +775,7 @@ function inoltra(da, text, code){
 let vidParti = [];
 handlers.vidChunk = c => {
   if (MODE !== 'viewer' || chiamataV) return;
-  if (c.i === 0) { vidParti = []; hint('Carico la registrazione…'); }
+  if (c.i === 0) { vidParti = []; hint(T('Carico la registrazione…', "Loading recording…")); }
   const bin = atob(String(c.data || '')); const u = new Uint8Array(bin.length);
   for (let k = 0; k < bin.length; k++) u[k] = bin.charCodeAt(k);
   vidParti.push(u);
@@ -780,8 +783,8 @@ handlers.vidChunk = c => {
   const blob = new Blob(vidParti, { type: String(c.mime || 'video/mp4') }); vidParti = [];
   fermaDemo(); video.srcObject = null;
   video.src = URL.createObjectURL(blob); video.loop = true; video.muted = false;
-  video.play().then(() => stato('Registrazione in riproduzione. Guardati intorno.'))
-             .catch(() => { hint('Tocca la scena per avviare il video'); stato('Registrazione pronta: tocca la scena per avviarla.'); });
+  video.play().then(() => stato(T('Registrazione in riproduzione. Guardati intorno.', "Recording playing. Look around.")))
+             .catch(() => { hint(T('Tocca la scena per avviare il video', "Tap the scene to start the video")); stato(T('Registrazione pronta: tocca la scena per avviarla.', "Recording ready: tap the scene to start it.")); });
   send({ type:'test', name:'video' });
 };
 function canaliUscita(){
@@ -795,22 +798,22 @@ function sorvegliaPrimaria(call){
   call.on('close', () => {
     if (chiamataS !== call) return;
     const conn = Object.entries(ospiti).find(([, o]) => o.state === 'connected');
-    if (!conn) { fineS(); stato('Chiamata terminata.'); return; }
+    if (!conn) { fineS(); stato(T('Chiamata terminata.', "Call ended.")); return; }
     // il visore principale ha chiuso: un ospite diventa il principale e la trasmissione continua
     const [code, o] = conn;
     clearTimeout(o.timer); delete ospiti[code];
     const vecchioDc = canaleS;
     chiamataS = o.call; canaleS = o.dc; codicePrimario = code;
     if (vecchioDc) setTimeout(() => { try { vecchioDc.close(); } catch {} }, 300);
-    canaleS.on('data', d => { if (d && d.t === 'decline' && chiamataS === o.call) { stato('Chiamata rifiutata dal visore.'); fineS(); } });
+    canaleS.on('data', d => { if (d && d.t === 'decline' && chiamataS === o.call) { stato(T('Chiamata rifiutata dal visore.', "Call declined by the headset.")); fineS(); } });
     sorvegliaPrimaria(o.call);
     const pcP = o.call.peerConnection;
     if (pcP) pcP.addEventListener('connectionstatechange', () => {
-      if (chiamataS === o.call && pcP.connectionState === 'failed') { stato('Collegamento perso con il visore.'); fineS(); }
+      if (chiamataS === o.call && pcP.connectionState === 'failed') { stato(T('Collegamento perso con il visore.', "Lost connection with the headset.")); fineS(); }
     });
     avviaStats(pcP, 'out');
     statoOspite(code, 'promoted');
-    stato('Il visore principale ha chiuso: continui a trasmettere a ' + code + '.');
+    stato(T('Il visore principale ha chiuso: continui a trasmettere a ', "The main headset hung up: you keep broadcasting to ") + code + '.');
   });
 }
 
@@ -831,7 +834,7 @@ function fineS(){
   $('audioRemoto').srcObject = null;
   send({ type:'ended' });
 }
-handlers.hangup = MODE === 'sender' ? () => { annullaS(); stato('Chiamata terminata.'); } : handlers.hangup;
+handlers.hangup = MODE === 'sender' ? () => { annullaS(); stato(T('Chiamata terminata.', "Call ended.")); } : handlers.hangup;
 
 
 /* ---------- reazioni che fluttuano nella scena 3D ---------- */
@@ -911,7 +914,7 @@ function scarica(url, nome){ const a = document.createElement('a'); a.href = url
 
 handlers.snapshot = () => {
   const src = demo ? demoCanvas : (video && video.videoWidth ? video : null);
-  if (!src) { send({ type:'snapError', text:'Nessun video da fotografare.' }); return; }
+  if (!src) { send({ type:'snapError', text:T('Nessun video da fotografare.', "No video to photograph.") }); return; }
   const w0 = demo ? src.width : src.videoWidth, h0 = demo ? src.height : src.videoHeight;
   const k = Math.min(1, 4096 / w0);
   const c = document.createElement('canvas'); c.width = Math.round(w0 * k); c.height = Math.round(h0 * k);
@@ -930,17 +933,17 @@ function sceltaMime(){
 }
 handlers.recStart = () => {
   if (registratore || attesaConsenso) return;
-  if (!inviaPari({ t:'recAsk' })) { send({ type:'recError', text:'Registrazione possibile solo durante una chiamata, con il consenso dell\'altra persona.' }); return; }
+  if (!inviaPari({ t:'recAsk' })) { send({ type:'recError', text:T('Registrazione possibile solo durante una chiamata, con il consenso dell\'altra persona.', "Recording is only possible during a call, with the other person's consent.") }); return; }
   send({ type:'recWaiting' });
-  attesaConsenso = setTimeout(() => { attesaConsenso = null; send({ type:'recError', text:"Nessuna risposta: la registrazione non è partita." }); }, 30000);
+  attesaConsenso = setTimeout(() => { attesaConsenso = null; send({ type:'recError', text:T("Nessuna risposta: la registrazione non è partita.", "No answer: recording did not start.") }); }, 30000);
 };
 function avviaRec(){
   if (registratore) return;
   const stream = MODE === 'sender' ? streamLocale : (video && video.srcObject);
-  if (!stream || !window.MediaRecorder) { send({ type:'recError', text:'Registrazione non disponibile su questo dispositivo.' }); return; }
+  if (!stream || !window.MediaRecorder) { send({ type:'recError', text:T('Registrazione non disponibile su questo dispositivo.', "Recording isn't available on this device.") }); return; }
   const mime = sceltaMime();
   try { registratore = new MediaRecorder(stream, { ...(mime ? { mimeType: mime } : {}), videoBitsPerSecond: 8000000 }); }
-  catch (e) { registratore = null; send({ type:'recError', text:'Registrazione non avviata: ' + e.message }); return; }
+  catch (e) { registratore = null; send({ type:'recError', text:T('Registrazione non avviata: ', "Recording not started: ") + e.message }); return; }
   pezzi = [];
   registratore.ondataavailable = e => { if (e.data && e.data.size) pezzi.push(e.data); };
   registratore.onstop = salvaRegistrazione;
@@ -958,7 +961,7 @@ async function salvaRegistrazione(){
   const blob = new Blob(pezzi, { type: mime }); pezzi = [];
   const ext = mime.includes('mp4') ? 'mp4' : 'webm';
   const nome = 'VR180-chiamata-' + ora8() + '.' + ext;
-  if (!blob.size) { send({ type:'recError', text:'Registrazione vuota.' }); return; }
+  if (!blob.size) { send({ type:'recError', text:T('Registrazione vuota.', "Empty recording.") }); return; }
   if (!nativo) { scarica(URL.createObjectURL(blob), nome); send({ type:'recSaved', name: nome, web: true }); return; }
   const CH = 3 * 256 * 1024, n = Math.ceil(blob.size / CH);
   for (let i = 0; i < n; i++) {

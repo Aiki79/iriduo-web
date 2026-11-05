@@ -8,11 +8,12 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Btn, Chip, ChipRow, Header } from "@/src/components/ui";
 import { deleteMemory, listMemories, shareFile, type Memory } from "@/src/media";
+import { tr, useLang } from "@/src/i18n";
 import { colors, fonts, radius, spacing } from "@/src/theme";
 
 const isWeb = Platform.OS === "web";
 const mb = (b: number) => `${(b / 1048576).toFixed(1)} MB`;
-const when = (t: number) => (t ? new Date(t).toLocaleString("it-IT", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "");
+const when = (t: number) => (t ? new Date(t).toLocaleString(tr("it-IT", "en-GB"), { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "");
 
 function Action({ icon, label, onPress, testID, danger }: { icon: "eye" | "share-2" | "trash-2"; label: string; onPress: () => void; testID: string; danger?: boolean }) {
   return (
@@ -23,6 +24,7 @@ function Action({ icon, label, onPress, testID, danger }: { icon: "eye" | "share
 }
 
 export default function Gallery() {
+  useLang();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [items, setItems] = useState<Memory[]>([]);
@@ -42,12 +44,12 @@ export default function Gallery() {
 
   return (
     <View style={styles.root} testID="gallery-screen">
-      <Header title="Ricordi 3D" />
+      <Header title={tr("Ricordi 3D", "3D memories")} />
       {items.length > 0 ? (
         <View style={styles.filters}>
           <ChipRow testID="gallery-filters">
-            <Chip testID="gallery-filter-all" label={`Tutti · ${items.length}`} selected={filter === "all"} onPress={() => setFilter("all")} />
-            <Chip testID="gallery-filter-photo" icon="camera" label={`Foto · ${photos}`} selected={filter === "photo"} onPress={() => setFilter("photo")} />
+            <Chip testID="gallery-filter-all" label={`${tr("Tutti", "All")} · ${items.length}`} selected={filter === "all"} onPress={() => setFilter("all")} />
+            <Chip testID="gallery-filter-photo" icon="camera" label={`${tr("Foto", "Photos")} · ${photos}`} selected={filter === "photo"} onPress={() => setFilter("photo")} />
             <Chip testID="gallery-filter-video" icon="film" label={`Video · ${items.length - photos}`} selected={filter === "video"} onPress={() => setFilter("video")} />
           </ChipRow>
         </View>
@@ -56,11 +58,11 @@ export default function Gallery() {
         <View style={[styles.modal, { paddingTop: insets.top + spacing.md, paddingBottom: insets.bottom + spacing.md }]} testID="gallery-preview">
           {preview ? <Image source={{ uri: preview.uri }} style={styles.big} contentFit="contain" /> : null}
           <View style={styles.modalRow}>
-            <Btn compact testID="gallery-preview-close" label="Chiudi" icon="x" onPress={() => setPreview(null)} style={styles.flex} />
+            <Btn compact testID="gallery-preview-close" label={tr("Chiudi", "Close")} icon="x" onPress={() => setPreview(null)} style={styles.flex} />
             <Btn
               compact
               testID="gallery-preview-3d"
-              label="Guarda in 3D"
+              label={tr("Guarda in 3D", "View in 3D")}
               icon="eye"
               variant="primary"
               style={styles.flex}
@@ -82,7 +84,7 @@ export default function Gallery() {
           <View style={styles.card} testID={`gallery-item-${item.name}`}>
             <Pressable
               testID={`gallery-thumb-${item.name}`}
-              accessibilityLabel={item.kind === "photo" ? "Ingrandisci foto" : "Guarda il video in 3D"}
+              accessibilityLabel={item.kind === "photo" ? tr("Ingrandisci foto", "Enlarge photo") : tr("Guarda il video in 3D", "Watch the video in 3D")}
               onPress={() => (item.kind === "photo" ? setPreview(item) : open3D(item))}
             >
               {item.kind === "photo" ? (
@@ -94,7 +96,7 @@ export default function Gallery() {
               )}
             </Pressable>
             <View style={styles.info}>
-              <Text style={styles.title}>{item.kind === "photo" ? "Foto 3D" : "Video della chiamata"}</Text>
+              <Text style={styles.title}>{item.kind === "photo" ? tr("Foto 3D", "3D photo") : tr("Video della chiamata", "Call video")}</Text>
               <Text style={styles.meta} numberOfLines={1}>
                 {when(item.at)} · {mb(item.size)}
               </Text>
@@ -102,10 +104,10 @@ export default function Gallery() {
                 <Action
                   testID={`gallery-view-${item.name}`}
                   icon="eye"
-                  label="Guarda in 3D"
+                  label={tr("Guarda in 3D", "View in 3D")}
                   onPress={() => open3D(item)}
                 />
-                <Action testID={`gallery-share-${item.name}`} icon="share-2" label="Condividi" onPress={() => shareFile(item.uri, item.kind === "photo" ? "image/jpeg" : "video/mp4")} />
+                <Action testID={`gallery-share-${item.name}`} icon="share-2" label={tr("Condividi", "Share")} onPress={() => shareFile(item.uri, item.kind === "photo" ? "image/jpeg" : "video/mp4")} />
                 {confirm === item.name ? (
                   <Pressable
                     testID={`gallery-delete-confirm-${item.name}`}
@@ -116,10 +118,10 @@ export default function Gallery() {
                     }}
                     style={({ pressed }) => [styles.confirm, pressed && styles.pressed]}
                   >
-                    <Text style={styles.confirmText}>Elimina</Text>
+                    <Text style={styles.confirmText}>{tr("Elimina", "Delete")}</Text>
                   </Pressable>
                 ) : (
-                  <Action testID={`gallery-delete-${item.name}`} icon="trash-2" label="Elimina" onPress={() => setConfirm(item.name)} danger />
+                  <Action testID={`gallery-delete-${item.name}`} icon="trash-2" label={tr("Elimina", "Delete")} onPress={() => setConfirm(item.name)} danger />
                 )}
               </View>
             </View>
@@ -128,11 +130,11 @@ export default function Gallery() {
         ListEmptyComponent={
           <View style={styles.empty} testID="gallery-empty">
             <TwoPeople size={140} />
-            <Text style={styles.emptyTitle}>{isWeb ? "Galleria disponibile sul telefono" : "Ancora nessun ricordo"}</Text>
+            <Text style={styles.emptyTitle}>{isWeb ? tr("Galleria disponibile sul telefono", "Gallery available on the phone") : tr("Ancora nessun ricordo", "No memories yet")}</Text>
             <Text style={styles.emptyText}>
               {isWeb
-                ? "Nel browser foto e video vengono scaricati come file. Nell'app sul telefono restano qui, pronti da riguardare in 3D."
-                : "Durante una chiamata tocca Foto 3D o Registra: troverai qui foto e video, pronti da riguardare in 3D."}
+                ? tr("Nel browser foto e video vengono scaricati come file. Nell'app sul telefono restano qui, pronti da riguardare in 3D.", "In the browser, photos and videos are downloaded as files. In the phone app they stay here, ready to watch again in 3D.")
+                : tr("Durante una chiamata tocca Foto 3D o Registra: troverai qui foto e video, pronti da riguardare in 3D.", "During a call tap 3D photo or Record: you'll find photos and videos here, ready to watch again in 3D.")}
             </Text>
           </View>
         }

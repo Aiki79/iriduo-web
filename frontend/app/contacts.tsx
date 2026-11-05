@@ -8,9 +8,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Btn, Header, Label } from "@/src/components/ui";
 import { getContacts, removeContact, upsertContact, type Contact } from "@/src/contacts";
+import { tr, useLang } from "@/src/i18n";
 import { colors, fonts, radius, spacing } from "@/src/theme";
 
 export default function Contacts() {
+  useLang();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { code: preCode } = useLocalSearchParams<{ code?: string }>();
@@ -31,31 +33,35 @@ export default function Contacts() {
   }, [preCode]);
 
   const save = async () => {
-    if (!name.trim()) return setError("Scrivi un nome.");
-    if (!/^\d{6}$/.test(code)) return setError("Il codice deve avere 6 cifre.");
+    if (!name.trim()) return setError(tr("Scrivi un nome.", "Enter a name."));
+    if (!/^\d{6}$/.test(code)) return setError(tr("Il codice deve avere 6 cifre.", "The code must have 6 digits."));
     setError("");
     const existing = list.find((c) => c.code === code);
     setList(await upsertContact({ name: name.trim().slice(0, 40), code }));
-    setNotice(existing ? `Codice ${code}: nome aggiornato da "${existing.name}" a "${name.trim()}".` : `${name.trim()} salvato in rubrica.`);
+    setNotice(
+      existing
+        ? tr(`Codice ${code}: nome aggiornato da "${existing.name}" a "${name.trim()}".`, `Code ${code}: name changed from "${existing.name}" to "${name.trim()}".`)
+        : tr(`${name.trim()} salvato in rubrica.`, `${name.trim()} saved to your address book.`),
+    );
     setName("");
     setCode("");
   };
 
   return (
     <View style={styles.root} testID="contacts-screen">
-      <Header title="Rubrica" />
+      <Header title={tr("Rubrica", "Address book")} />
       <KeyboardAwareScrollView
         bottomOffset={spacing.lg}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.xl }]}
       >
         <View style={styles.form}>
-          <Label>Nuovo contatto</Label>
+          <Label>{tr("Nuovo contatto", "New contact")}</Label>
           <TextInput
             testID="contacts-name-input"
             value={name}
             onChangeText={setName}
-            placeholder="Nome, es. Marco"
+            placeholder={tr("Nome, es. Marco", "Name, e.g. Mark")}
             placeholderTextColor={colors.muted}
             maxLength={40}
             style={styles.input}
@@ -65,7 +71,7 @@ export default function Contacts() {
             testID="contacts-code-input"
             value={code}
             onChangeText={(t) => setCode(t.replace(/\D/g, "").slice(0, 6))}
-            placeholder="Codice (6 cifre)"
+            placeholder={tr("Codice (6 cifre)", "Code (6 digits)")}
             placeholderTextColor={colors.muted}
             keyboardType="number-pad"
             maxLength={6}
@@ -83,14 +89,14 @@ export default function Contacts() {
               {notice}
             </Text>
           ) : null}
-          <Btn testID="contacts-save-button" label="Salva in rubrica" icon="user-plus" variant="primary" onPress={save} />
-          <Text style={styles.hint}>Il codice del visore cambia a ogni apertura: aggiornalo quando il tuo contatto te ne manda uno nuovo.</Text>
+          <Btn testID="contacts-save-button" label={tr("Salva in rubrica", "Save contact")} icon="user-plus" variant="primary" onPress={save} />
+          <Text style={styles.hint}>{tr("Se il visore ha un codice che cambia, aggiornalo qui quando il tuo contatto te ne manda uno nuovo (oppure chiedigli di attivare \"Tieni sempre questo codice\").", "If the headset's code changes, update it here when your contact sends you a new one (or ask them to turn on \"Always keep this code\").")}</Text>
         </View>
 
-        <Label>Contatti</Label>
+        <Label>{tr("Contatti", "Contacts")}</Label>
         {list.length === 0 ? (
           <Text style={styles.hint} testID="contacts-empty">
-            Nessun contatto. Salva qui sopra chi chiami spesso.
+            {tr("Nessun contatto. Salva qui sopra chi chiami spesso.", "No contacts yet. Save the people you call often above.")}
           </Text>
         ) : (
           list.map((c) => (
@@ -104,7 +110,7 @@ export default function Contacts() {
               </View>
               <Pressable
                 testID={`contacts-delete-${c.code}`}
-                accessibilityLabel={confirmDel === c.code ? `Conferma eliminazione di ${c.name}` : `Elimina ${c.name}`}
+                accessibilityLabel={confirmDel === c.code ? tr(`Conferma eliminazione di ${c.name}`, `Confirm deleting ${c.name}`) : tr(`Elimina ${c.name}`, `Delete ${c.name}`)}
                 onPress={async () => {
                   if (confirmDel !== c.code) return setConfirmDel(c.code);
                   setConfirmDel(null);
@@ -113,14 +119,14 @@ export default function Contacts() {
                 style={({ pressed }) => [styles.iconBtn, confirmDel === c.code && styles.delConfirm, pressed && styles.pressed]}
               >
                 {confirmDel === c.code ? (
-                  <Text style={styles.delText}>Sicuro?</Text>
+                  <Text style={styles.delText}>{tr("Sicuro?", "Sure?")}</Text>
                 ) : (
                   <Feather name="trash-2" size={18} color={colors.error} />
                 )}
               </Pressable>
               <Pressable
                 testID={`contacts-call-${c.code}`}
-                accessibilityLabel={`Chiama ${c.name}`}
+                accessibilityLabel={tr(`Chiama ${c.name}`, `Call ${c.name}`)}
                 onPress={() => router.push({ pathname: "/sender", params: { code: c.code } })}
                 style={({ pressed }) => [styles.call, pressed && styles.pressed]}
               >

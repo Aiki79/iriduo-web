@@ -2,6 +2,8 @@ import { Directory, File, Paths } from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import { Platform } from "react-native";
 
+import { tr } from "@/src/i18n";
+
 export type Memory = { name: string; uri: string; size: number; kind: "photo" | "video"; at: number };
 
 const isWeb = Platform.OS === "web";
@@ -21,7 +23,7 @@ function fileFor(name: string) {
 
 export async function shareFile(uri: string, mimeType: string) {
   if (isWeb) return;
-  if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(uri, { mimeType, dialogTitle: "Salva o condividi" });
+  if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(uri, { mimeType, dialogTitle: tr("Salva o condividi", "Save or share") });
 }
 
 /** Saves a photo into the in-app gallery and opens the share sheet. */

@@ -1,3 +1,4 @@
+import { tr } from "@/src/i18n";
 import { storage } from "@/src/utils/storage";
 
 export type CallResult = "completata" | "rifiutata" | "annullata" | "senza-risposta" | "persa" | "non-trovato";
@@ -42,11 +43,15 @@ export function topQuality(counts: Record<string, number>): string | null {
   return best;
 }
 
-export const RESULT_LABEL: Record<CallResult, string> = {
-  completata: "Completata",
-  rifiutata: "Rifiutata",
-  annullata: "Annullata",
-  "senza-risposta": "Nessuna risposta",
-  persa: "Persa",
-  "non-trovato": "Codice non trovato",
-};
+export const RESULT_LABEL = (r: CallResult) =>
+  ({
+    completata: tr("Completata", "Completed"),
+    rifiutata: tr("Rifiutata", "Declined"),
+    annullata: tr("Annullata", "Cancelled"),
+    "senza-risposta": tr("Nessuna risposta", "No answer"),
+    persa: tr("Persa", "Missed"),
+    "non-trovato": tr("Codice non trovato", "Code not found"),
+  })[r];
+
+/** Quality is stored with its Italian key ("Buona", "Media", "Debole", "Misuro…"): translate only for display. */
+export const qualityLabel = (q: string) => ({ Buona: tr("Buona", "Good"), Media: tr("Media", "Fair"), Debole: tr("Debole", "Weak"), "Misuro…": tr("Misuro…", "Measuring…") })[q] ?? q;

@@ -213,7 +213,7 @@ def _allowed_app_base(base: str) -> bool:
 
 
 @api_router.get("/join", include_in_schema=False)
-async def join(request: Request, code: str = Query(..., pattern=r"^\d{6}$"), app_base: str = Query("frontend://", alias="app", max_length=300)):
+async def join(request: Request, code: str = Query(..., pattern=r"^\d{6}$"), app_base: str = Query("frontend://", alias="app", max_length=300), lang: str = Query("it", pattern=r"^(it|en)$")):
     """Shareable https link: opens the app on the sender screen with the code filled in."""
     host = (request.headers.get("x-forwarded-host") or request.headers.get("host") or "").split(",")[0].strip()
     own_web = f"https://{host}"  # web preview: same host as the API
@@ -223,6 +223,10 @@ async def join(request: Request, code: str = Query(..., pattern=r"^\d{6}$"), app
         base += "/"
     app_url = html.escape(f"{base}sender?code={code}", quote=True)
     page = JOIN_HTML.replace("{{CODE}}", code).replace("{{APP_URL}}", app_url)
+    if lang == "en":  # link preview (WhatsApp, SMS) in the sender's language
+        page = page.replace('<html lang="it">', '<html lang="en">').replace("IriDuo · codice ", "IriDuo · code ").replace(
+            "IriDuo — a tu per tu, in 3D. Tocca per aprire l'app e chiamare il visore.",
+            "IriDuo — face to face, in 3D. Tap to open the app and call the headset.")
     return HTMLResponse(page, headers={"Cache-Control": "no-cache"})
 
 

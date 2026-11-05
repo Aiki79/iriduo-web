@@ -1,0 +1,46 @@
+{
+  "summary": "Tested the frontend for the IT/EN i18n change and Home redesign, using Playwright against the public URL at 320/375/390 px. Real sender<->viewer calls were run with separate browser contexts set to different languages. PASS: (1) First launch: after clearing storage, the app goes to /language. The phone language is pre-selected (en-US -> English, it-IT -> Italiano), and the screen previews the selected language as you pick. Continue -> /welcome (3 steps + terms) -> Home. (2) English mode: welcome steps, terms, /legal?doc=terms and /legal?doc=privacy, and Home are all English. Viewer: 'Headset', 'Waiting for a call.', stage iframe lang=en 'Waiting for video…'. Sender: 'Starting camera…' -> 'Camera ready. Enter the headset code.', with a fake camera. Pro (prices €6.99 / month and €59.99 / year, activate/deactivate confirm), history, gallery and contacts (validation errors, saved notice, 'Sure?' delete) are English too. A scan for Italian words found nothing in English mode, including aria-labels. (3) home-language-button -> /language?from=home -> Italiano + Salva goes back to Home, which shows Italian right away. Switching back to English works. A deep-link /language?from=home also saves and returns to Home. (4) The language persists after reload. (5) Italian regression: home, welcome, terms, pro, history, contacts, gallery, viewer and sender are all Italian, with no English words. (6) Home at 320 and 390 px, IT and EN: no mid-word breaks (Range-rect check), no horizontal overflow, cards stacked (column, icon+chevron on top), greeting small and grey, slogan in a single language. (7) /api/join is English for an en-US browser and Italian for it-IT. (8) Cross-language call (viewer EN, sender IT): quick-reply chips are in each person's own language. Viewer sent 'I can see you well' -> the sender saw 'Ti vedo bene' (in chat and toast). Sender sent 'Non ti sento' -> the viewer saw 'I can't hear you'. Decline and answer statuses are correct in each language, and the report sheet and block confirm are English. FAILED/ISSUES: deep links skip the language and terms gate (HIGH). Minor: singular/plural text, untranslated native-only strings, join og/title meta always Italian, radio a11y state.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/join", "issue": "<title> and og:title/og:description are hard-coded Italian ('IriDuo · codice …', 'a tu per tu, in 3D. Tocca per aprire…'). WhatsApp/SMS link previews are therefore always Italian, even when an English user shares their code. Only the body text is switched by navigator.language. Reference: /app/backend/join.html:7-9"}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "First-launch gate (language + terms)", "issue": "Only Home (app/index.tsx:68-73) redirects to /language and /welcome. A fresh install opened through an invite deep link (/sender?code=XXXXXX, which /api/join opens) goes straight to the sender screen and auto-places the call. The user never chooses a language and never accepts the terms/age rules. Reproduced with a fresh browser context: localStorage had no lang_v1 or terms_v1, and the sender status already showed 'Code not found…' from the auto-call. The same happens with /viewer, /contacts and the other screens.", "testID": "sender-screen", "priority": "HIGH"},
+      {"component": "History summary / Pro counters", "issue": "No singular form: 'IriDuo history' showed '1 calls · 00:00 in 3D'. The Italian equivalent shows '1 chiamate'. The same applies to 'You have 1 free calls left' / 'Ti restano 1 chiamate gratuite' and '1 more calls hidden'. Reference: app/history.tsx:134,147; app/pro.tsx:43", "testID": "history-summary", "priority": "LOW"},
+      {"component": "Language options a11y", "issue": "The options use accessibilityRole='radio' with accessibilityState={{selected}}. Radios need {checked}: on web, aria-checked is missing, so screen readers do not announce which language is chosen. Reference: app/language.tsx:48-49", "testID": "language-option-en", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Language screen", "issues": ["No maxWidth: on tablet/desktop widths the options and the button stretch edge-to-edge (seen at 1568px). This is cosmetic only."]}
+    ],
+    "react_native_issues": [
+      {"component": "iOS permission strings", "issue": "The camera, microphone and motion usage descriptions are Italian only, so English users see Italian system permission prompts. Use app.json 'locales' (expo-localization plugin) for per-language InfoPlist/strings. Reference: /app/frontend/app.json:59-67"},
+      {"component": "Untranslated native-only strings", "issue": "The Sharing dialogTitle 'Salva o condividi' is hard-coded Italian (src/media.ts:24). The StageView iframe title 'Scena VR180' is an Italian a11y label (src/components/StageView.web.tsx:46)."}
+    ]
+  },
+  "test_report_links": [".screenshots/home_en_320.png", ".screenshots/home_it_320.png", ".screenshots/home_en_390.png", ".screenshots/viewer_en.png", ".screenshots/sender_en.png", ".screenshots/join_en.png"],
+  "action_items": [
+    "HIGH: Gate every entry route on first launch. In _layout.tsx (or a shared hook), after loadLang(): if !langChosen() -> /language, else if !terms_v1 -> /welcome. Keep the deep-link target (e.g. /sender?code=…) and continue to it after the user accepts. This stops an invite link from skipping language choice and terms, and from auto-calling.",
+    "Localize the join.html <title>/og:title/og:description. Options: Accept-Language on the server, or a &lang= param added by ShareCode joinLink().",
+    "Add singular/plural forms for the 'N calls', 'N free calls left' and 'N more calls hidden' strings in IT and EN.",
+    "Add app.json 'locales' with English and Italian permission strings.",
+    "Translate the media.ts Sharing dialogTitle and the StageView iframe title.",
+    "language.tsx: use accessibilityState={{ checked: on }} for the radio options."
+  ],
+  "critical_code_review_comments": [
+    "i18n via tr(it,en) + useSyncExternalStore is simple and works. Module-level lists are correctly wrapped as functions (BITRATES(), REASONS(), RULES(), FEATURES()), so nothing is frozen at import time.",
+    "CallChat localizeQuick maps quick replies by index between QUICK_IT and QUICK_EN. The two arrays must stay the same length and order. Free text is passed through unchanged (correct).",
+    "Sender status classification regexes (sender.tsx:303,386) match both languages. EN 'declined', 'no answer' and 'not found' map to the same CallResult as IT, which was verified in history ('Declined' / 'Rifiutata').",
+    "viewer.tsx (715 lines) and sender.tsx (710 lines) exceed the 700-line guideline and should be split.",
+    "Contacts hint says 'The headset code changes every time it opens'. This contradicts the viewer's 'Always keep this code' option, so the copy is outdated in both languages."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (frontend only)", "frontend": "~92% (all requested flows pass; 1 HIGH gate-bypass issue on deep links plus minor copy/a11y items)"},
+  "seed_data_creation": "No seed data was created. A TEST_Mark contact (123456) was created and deleted, in a browser-local store only. Calls were made between throwaway browser contexts.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Storage values are JSON strings. To preset state, use add_init_script: localStorage lang_v1=JSON.stringify('en'|'it'), terms_v1='true', onboarded='true'. For cross-language calls, use page.context.browser.new_context(permissions=['camera','microphone'], locale=...). The browser already has fake media. Read viewer-code by polling. Chat chips: viewer-chat-composer-quick-N and sender-chat-composer-quick-N; messages: *-chat-msg-them. If the sender leaves with page.goto, that call is not saved in the sender's history; use the hang-up button for history checks."
+}

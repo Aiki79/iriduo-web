@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 import type { Fisheye } from "@/src/components/FisheyePanel";
 import { Btn } from "@/src/components/ui";
+import { tr } from "@/src/i18n";
 import { deleteProfile, sameFe, saveProfile, useProfiles } from "@/src/profiles";
 import { colors, fonts, radius, spacing } from "@/src/theme";
 
@@ -16,8 +17,8 @@ export function CameraProfiles({ value, onApply }: { value: Fisheye; onApply: (f
 
   return (
     <View style={styles.wrap} testID="viewer-profiles">
-      <Text style={styles.title}>Profili camera</Text>
-      {list.length === 0 ? <Text style={styles.empty}>Nessun profilo salvato. Regola i cerchi e salva le impostazioni con il nome della camera.</Text> : null}
+      <Text style={styles.title}>{tr("Profili camera", "Camera profiles")}</Text>
+      {list.length === 0 ? <Text style={styles.empty}>{tr("Nessun profilo salvato. Regola i cerchi e salva le impostazioni con il nome della camera.", "No saved profiles. Adjust the circles and save the settings with the camera's name.")}</Text> : null}
       {list.map((p) => {
         const active = sameFe(p.fe, value);
         return (
@@ -25,7 +26,7 @@ export function CameraProfiles({ value, onApply }: { value: Fisheye; onApply: (f
             <Pressable
               testID={`viewer-profile-apply-${p.name}`}
               accessibilityRole="button"
-              accessibilityLabel={`Usa il profilo ${p.name}`}
+              accessibilityLabel={tr(`Usa il profilo ${p.name}`, `Use profile ${p.name}`)}
               onPress={() => onApply(p.fe)}
               style={({ pressed }) => [styles.apply, pressed && styles.pressed]}
             >
@@ -35,29 +36,29 @@ export function CameraProfiles({ value, onApply }: { value: Fisheye; onApply: (f
                   {p.name}
                 </Text>
                 <Text style={styles.meta} numberOfLines={1}>
-                  {`${p.fe.fov}° · cerchio ${p.fe.raggio}% · centro ${p.fe.dx}/${p.fe.dy} px`}
+                  {tr(`${p.fe.fov}° · cerchio ${p.fe.raggio}% · centro ${p.fe.dx}/${p.fe.dy} px`, `${p.fe.fov}° · circle ${p.fe.raggio}% · center ${p.fe.dx}/${p.fe.dy} px`)}
                 </Text>
               </View>
             </Pressable>
             {confirm === p.id ? (
               <>
-                <Pressable testID={`viewer-profile-cancel-delete-${p.name}`} accessibilityLabel="Annulla eliminazione" onPress={() => setConfirm(null)} style={styles.del}>
+                <Pressable testID={`viewer-profile-cancel-delete-${p.name}`} accessibilityLabel={tr("Annulla eliminazione", "Cancel deletion")} onPress={() => setConfirm(null)} style={styles.del}>
                   <Feather name="x" size={18} color={colors.muted} />
                 </Pressable>
                 <Pressable
                   testID={`viewer-profile-confirm-delete-${p.name}`}
-                  accessibilityLabel={`Conferma eliminazione ${p.name}`}
+                  accessibilityLabel={tr(`Conferma eliminazione ${p.name}`, `Confirm deleting ${p.name}`)}
                   onPress={async () => {
                     setList(await deleteProfile(p.id));
                     setConfirm(null);
                   }}
                   style={styles.delConfirm}
                 >
-                  <Text style={styles.delText}>Elimina</Text>
+                  <Text style={styles.delText}>{tr("Elimina", "Delete")}</Text>
                 </Pressable>
               </>
             ) : (
-              <Pressable testID={`viewer-profile-delete-${p.name}`} accessibilityLabel={`Elimina ${p.name}`} onPress={() => setConfirm(p.id)} style={styles.del}>
+              <Pressable testID={`viewer-profile-delete-${p.name}`} accessibilityLabel={tr(`Elimina ${p.name}`, `Delete ${p.name}`)} onPress={() => setConfirm(p.id)} style={styles.del}>
                 <Feather name="trash-2" size={18} color={colors.muted} />
               </Pressable>
             )}
@@ -69,7 +70,7 @@ export function CameraProfiles({ value, onApply }: { value: Fisheye; onApply: (f
           testID="viewer-profile-name-input"
           value={name}
           onChangeText={setName}
-          placeholder="Nome camera, es. ELP salotto"
+          placeholder={tr("Nome camera, es. ELP salotto", "Camera name, e.g. ELP living room")}
           placeholderTextColor={colors.muted}
           maxLength={30}
           style={styles.input}
@@ -78,7 +79,7 @@ export function CameraProfiles({ value, onApply }: { value: Fisheye; onApply: (f
         <Btn
           compact
           testID="viewer-profile-save-button"
-          label="Salva"
+          label={tr("Salva", "Save")}
           icon="save"
           variant="primary"
           disabled={!valid}
