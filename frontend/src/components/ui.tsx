@@ -201,7 +201,7 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.sm,
     backgroundColor: colors.surface,
   },
-  headerTitle: { flex: 1, fontFamily: fonts.bold, fontSize: 24, color: colors.onSurface },
+  headerTitle: { flex: 1, fontFamily: fonts.display, fontSize: 24, color: colors.onSurface },
   headerRight: { flexDirection: "row", gap: spacing.sm },
   toggleRow: {
     minHeight: 56,

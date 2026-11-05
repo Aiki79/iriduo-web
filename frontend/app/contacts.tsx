@@ -2,6 +2,7 @@ import { Feather } from "@react-native-vector-icons/feather";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Avatar } from "@/src/components/Warm";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -94,9 +95,7 @@ export default function Contacts() {
         ) : (
           list.map((c) => (
             <View key={c.code} style={styles.row} testID={`contacts-row-${c.code}`}>
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>{c.name.slice(0, 1).toUpperCase()}</Text>
-              </View>
+              <Avatar name={c.name} />
               <View style={styles.flex}>
                 <Text style={styles.name} numberOfLines={1}>
                   {c.name}
@@ -158,8 +157,6 @@ const styles = StyleSheet.create({
   delText: { fontFamily: fonts.bold, fontSize: 13, color: colors.onError },
   hint: { fontFamily: fonts.regular, fontSize: 14, color: colors.muted, lineHeight: 20 },
   row: { flexDirection: "row", alignItems: "center", gap: spacing.md, backgroundColor: colors.surfaceSecondary, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, padding: spacing.md },
-  avatar: { width: 44, height: 44, borderRadius: radius.pill, backgroundColor: colors.brandSecondary, alignItems: "center", justifyContent: "center" },
-  avatarText: { fontFamily: fonts.bold, fontSize: 18, color: colors.brandPrimary },
   name: { fontFamily: fonts.bold, fontSize: 17, color: colors.onSurface },
   code: { fontFamily: fonts.regular, fontSize: 14, color: colors.muted, letterSpacing: 2 },
   iconBtn: { width: 44, height: 44, borderRadius: radius.md, alignItems: "center", justifyContent: "center", backgroundColor: colors.surfaceTertiary },

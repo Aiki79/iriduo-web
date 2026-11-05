@@ -16,6 +16,7 @@ import { StageView } from "@/src/components/StageView";
 import { ChatComposer, ChatPanel, ChatToasts, newMessage, type ChatMessage } from "@/src/components/CallChat";
 import { ReactionBar } from "@/src/components/Reactions";
 import { FE_BASE, FisheyePanel, type Fisheye } from "@/src/components/FisheyePanel";
+import { HeartBurst } from "@/src/components/Warm";
 import { FREE_REACTIONS, useProState } from "@/src/pro";
 import { ChunkReceiver, readMemoryBase64, saveAndShare, sendVideoFile } from "@/src/media";
 import { CallPill, CallStatsCard, formatDuration, quality, type CallStatsData } from "@/src/components/CallStats";
@@ -85,6 +86,15 @@ export default function Viewer() {
   const [fe, setFe] = useState<Fisheye>(FE_BASE);
   const [guide, setGuide] = useState(false);
   const [xrOk, setXrOk] = useState(false);
+  const [heart, setHeart] = useState(false);
+  const heartShownRef = useRef(false);
+  const heartTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (heartTimer.current) clearTimeout(heartTimer.current);
+    },
+    [],
+  );
   useEffect(() => {
     if (format !== "fisheye" && guide) {
       setGuide(false);
@@ -239,6 +249,16 @@ export default function Viewer() {
           break;
         case "connected":
           setPhase("connected");
+          if (!isWeb) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          if (!heartShownRef.current) {
+            heartShownRef.current = true; // guards against two quick "connected" events
+            storage.getItem("first_call_done", false).then((done) => {
+              if (done) return;
+              storage.setItem("first_call_done", true);
+              setHeart(true);
+              heartTimer.current = setTimeout(() => setHeart(false), 1800);
+            });
+          }
           setTestOpen(false);
           setTesting(null);
           setStartedAt((t) => t ?? Date.now());
@@ -635,6 +655,7 @@ export default function Viewer() {
           {testOpen && <Text style={[styles.small, styles.mt]}>Tocca il riquadro nella scena qui sopra per scegliere il video.</Text>}
         </KeyboardAwareScrollView>
       )}
+      {heart ? <HeartBurst testID="viewer-heart" /> : null}
     </View>
   );
 }

@@ -1,0 +1,30 @@
+{
+  "summary": "Frontend-only test of the warm restyle at 375x667, 390x844 and 320x640. ALL requested checks PASS and there were no page errors. (1) Home: the greeting is correct for every hour tested with page.clock (3,4->Buonanotte; 5,9,12->Buongiorno; 13,17->Buon pomeriggio; 18,21,23->Buonasera). home-art (128px, the two people) is visible and floats: translateY moves between about -4.3 and 0. home-title and the greeting use VarelaRound (document.fonts shows VarelaRound: loaded). The viewer card icon is cyan rgb(92,200,224) and the sender card icon is coral rgb(255,122,138). home-logo is present. No horizontal overflow at 390 or 320 (scrollWidth equals the viewport and no testID element goes outside it). All 7 home entries navigate correctly: pro, history, contacts, gallery, welcome, viewer, sender. (2) Contacts: round 44px avatars with dark text (#0E1A2B). Initials: 'Mario Rossi'->MR, 'Anna'->A, '  luca   bianchi verdi '->LB, 'élodie ünal'->ÉÜ. Saving the same code updates the name (notice shown, avatar changes to GN). Delete with the 'Sicuro?' confirmation works. Contacts persist after reload. No overflow at 320. (3) history-empty and gallery-empty show the 140px two-people image with display-font titles. (4) Headers on /pro, /history, /contacts, /gallery, /viewer and /sender use VarelaRound 24px. (5) Heart: a real sender->viewer call with fake media. viewer-heart 'Prima chiamata in 3D!' appeared 0.2s after answering and was removed after about 2.3s (1.8s plus the 500ms fade-out). localStorage first_call_done went from null to true. On a second call the viewer connected ('Collegato: sei in chiamata 3D.') and the heart did not show again. Hangup from both sides works. (6) Regression: /, /pro, /sender, /viewer (including the fisheye panel), /contacts, /history and /welcome render with the new theme. A WCAG contrast scan of all visible text found 0 elements below 4.5:1. Deprecated packages detected: none (no expo-av, expo-barcode-scanner or expo-background-fetch).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "contacts", "issues": ["The avatar colour hash (h*31+c) mod 6 is close to 'sum of char codes mod 6' because 31 ≡ 1 (mod 6), so collisions are common. In testing, 3 of 4 contacts (Giulia Neri, luca bianchi verdi, élodie ünal) all got the same #F6C177. Suggestion: use an odd multiplier that is coprime with 6, such as 33 or 37, or a 7-colour palette."]},
+      {"screen": "viewer", "issues": ["HeartBurst covers the whole viewer root (absoluteFill), so for about 2s it overlaps the status box and the top of the stage. It does not block input (pointerEvents none), so this is cosmetic only."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Optional: clear the heart setTimeout on unmount in app/viewer.tsx:249 (store it in a ref). This avoids a setState after the user leaves the viewer within 1.8s.",
+    "Optional: guard against a double heart when two 'connected' events arrive before the async storage write finishes (app/viewer.tsx:245-250). Use a ref flag such as heartShownRef.",
+    "Optional: improve avatar colour spread (src/components/Warm.tsx:32). Use a multiplier coprime with the palette length.",
+    "Optional: Avatar takes initials with words[0][0], which splits emoji/surrogate pairs (a name starting with an emoji shows a broken glyph). Use Array.from(word)[0]."
+  ],
+  "critical_code_review_comments": [
+    "Warm.tsx: greeting() runs once at render, so it does not update if the app stays open across an hour boundary. This is acceptable.",
+    "viewer.tsx:245: first_call_done is read and written only on the viewer. The sender's first call never shows the heart. This is fine if that was intended."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped)", "frontend": "100%"},
+  "seed_data_creation": "None. The contacts were created only in the browser's localStorage of a throwaway Playwright context.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Use page.add_init_script(\"localStorage.setItem('onboarded','true')\"). page.clock.set_fixed_time(datetime) works for testing the greeting. For the call test: ctx = page.context; ctx.grant_permissions(['camera','microphone'], origin=BASE). The fake camera already works in the tool's Chromium. Open the sender with ctx.new_page(), fill sender-code-input and click sender-call-button, then click viewer-answer-button on the viewer. viewer-heart appears about 0.2s after answering. Screenshot paths must be plain literals (the tool rewrites path strings, and f-strings break)."
+}

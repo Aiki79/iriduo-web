@@ -80,3 +80,8 @@
 ## Jun 2026 - WebXR (vero 3D su Meta Quest)
 - stage.html: renderer.xr.enabled, pulsante #vr 'Entra nel visore 3D' (solo se immersive-vr supportato), in XR render diretto (layer 1 occhio sx, 2 dx)
 - iframe allow xr-spatial-tracking; nota viewer-xr-note
+
+## Jun 2026 - Stile caldo
+- Tema: superfici indaco caldo, accento corallo (accent), radius più ampi, font titoli VarelaRound (fonts.display)
+- Home: saluto per ora del giorno, due persone animate (TwoPeople), card colorate (azzurro guardo / corallo trasmetto), menu con icone colorate
+- Avatar con iniziali colorate in rubrica; illustrazione nelle pagine vuote; vibrazione + cuore alla prima chiamata riuscita (viewer)

@@ -7,23 +7,23 @@ import { Appearance, StyleSheet } from "react-native";
 export type ColorScheme = "light" | "dark";
 
 const dark = {
-  surface: "#0E1A2B",
+  surface: "#151833",
   onSurface: "#EAF0F7",
-  surfaceSecondary: "#17283F",
+  surfaceSecondary: "#211F45",
   onSurfaceSecondary: "#EAF0F7",
-  surfaceTertiary: "#122033",
+  surfaceTertiary: "#1B1A3C",
   onSurfaceTertiary: "#EAF0F7",
   surfaceInverse: "#EAF0F7",
-  onSurfaceInverse: "#0E1A2B",
-  muted: "#9DB0C8",
+  onSurfaceInverse: "#151833",
+  muted: "#B3B0D6",
 
   brand: "#5CC8E0",
   onBrand: "#0E1A2B",
   brandPrimary: "#5CC8E0",
   onBrandPrimary: "#0E1A2B",
-  brandSecondary: "#2A4060",
+  brandSecondary: "#3A3566",
   onBrandSecondary: "#EAF0F7",
-  brandTertiary: "#17283F",
+  brandTertiary: "#211F45",
   onBrandTertiary: "#EAF0F7",
 
   success: "#5CE093",
@@ -36,10 +36,16 @@ const dark = {
   info: "#5CC8E0",
   onInfo: "#0E1A2B",
 
-  border: "#2A4060",
+  // warm coral from the icon: "trasmetto", hearts, highlights
+  accent: "#FF7A8A",
+  onAccent: "#2A0F18",
+  accentSoft: "rgba(255,122,138,0.14)",
+  glow: "rgba(92,200,224,0.16)",
+
+  border: "#38346A",
   borderStrong: "#5CC8E0",
-  divider: "#2A4060",
-  scrim: "rgba(14,26,43,0.72)",
+  divider: "#38346A",
+  scrim: "rgba(21,24,51,0.72)",
   stage: "#000000",
 };
 
@@ -51,9 +57,9 @@ export const themes: { light?: ThemeColors; dark: ThemeColors } = { dark };
 
 export const colors = dark;
 
-export const fonts = { regular: "Atkinson-Regular", bold: "Atkinson-Bold" };
+export const fonts = { regular: "Atkinson-Regular", bold: "Atkinson-Bold", display: "VarelaRound" };
 export const spacing = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, "2xl": 32, "3xl": 48 };
-export const radius = { sm: 6, md: 14, lg: 20, pill: 999 };
+export const radius = { sm: 8, md: 18, lg: 26, pill: 999 };
 
 export function setColorScheme(scheme: ColorScheme | null) {
   Appearance.setColorScheme?.(scheme ?? "unspecified");

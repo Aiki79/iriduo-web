@@ -2,6 +2,7 @@ import { Feather } from "@react-native-vector-icons/feather";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { TwoPeople } from "@/src/components/Warm";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -147,7 +148,7 @@ export default function History() {
         ListEmptyComponent={
           items ? (
             <View style={styles.empty} testID="history-empty">
-              <Feather name="clock" size={40} color={colors.muted} />
+              <TwoPeople size={140} />
               <Text style={styles.emptyTitle}>Nessuna chiamata per ora</Text>
               <Text style={styles.emptyText}>Le chiamate fatte e ricevute compariranno qui, con durata e qualità.</Text>
               <Btn testID="history-empty-call-button" label="Fai una chiamata" icon="video" variant="primary" onPress={() => router.replace("/sender")} />
@@ -201,6 +202,6 @@ const styles = StyleSheet.create({
   confirmText: { fontFamily: fonts.bold, fontSize: 16, color: colors.onSurface },
   confirmRow: { flexDirection: "row", gap: spacing.sm },
   empty: { flex: 1, alignItems: "center", justifyContent: "center", gap: spacing.md, paddingHorizontal: spacing.xl },
-  emptyTitle: { fontFamily: fonts.bold, fontSize: 20, color: colors.onSurface },
+  emptyTitle: { fontFamily: fonts.display, fontSize: 20, color: colors.onSurface },
   emptyText: { fontFamily: fonts.regular, fontSize: 15, color: colors.muted, textAlign: "center", lineHeight: 21 },
 });

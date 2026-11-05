@@ -3,6 +3,7 @@ import { Image } from "expo-image";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import { FlatList, Modal, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { TwoPeople } from "@/src/components/Warm";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Btn, Chip, ChipRow, Header } from "@/src/components/ui";
@@ -126,7 +127,7 @@ export default function Gallery() {
         )}
         ListEmptyComponent={
           <View style={styles.empty} testID="gallery-empty">
-            <Feather name="image" size={40} color={colors.muted} />
+            <TwoPeople size={140} />
             <Text style={styles.emptyTitle}>{isWeb ? "Galleria disponibile sul telefono" : "Ancora nessun ricordo"}</Text>
             <Text style={styles.emptyText}>
               {isWeb
@@ -161,6 +162,6 @@ const styles = StyleSheet.create({
   confirmText: { fontFamily: fonts.bold, fontSize: 14, color: colors.onError },
   pressed: { opacity: 0.8, transform: [{ scale: 0.96 }] },
   empty: { flex: 1, alignItems: "center", justifyContent: "center", gap: spacing.md, paddingHorizontal: spacing.xl },
-  emptyTitle: { fontFamily: fonts.bold, fontSize: 20, color: colors.onSurface, textAlign: "center" },
+  emptyTitle: { fontFamily: fonts.display, fontSize: 20, color: colors.onSurface, textAlign: "center" },
   emptyText: { fontFamily: fonts.regular, fontSize: 15, color: colors.muted, textAlign: "center", lineHeight: 21 },
 });
