@@ -579,7 +579,7 @@ export default function Viewer() {
           <Text style={[styles.small, styles.mt]} testID="viewer-xr-note">
             {xrOk
               ? "Visore rilevato: tocca \"Entra nel visore 3D\" in basso nell'anteprima per vedere davvero in 3D."
-              : "Per il vero 3D su Meta Quest apri IriDuo nel browser del visore e tocca \"Entra nel visore 3D\". Qui sul telefono vedi un'anteprima piatta."}
+              : "Visore con telefono (Cardboard, VR Box…): scegli \"Schermo diviso\" e metti a schermo intero. Visori autonomi (Meta Quest, Pico, Apple Vision Pro…) e visori per PC: apri IriDuo nel browser del visore e tocca \"Entra nel visore 3D\"."}
           </Text>
 
           <Label>Formato video</Label>
