@@ -15,6 +15,12 @@ Target use: a computer with a VR180 camera (USB) broadcasts in Chrome/Edge → a
 - `StageView.web.tsx` already shows how the page embeds stage.html in an iframe — the web app should do the same.
 - Design: dark "warm" theme in `src/theme.ts`; fonts Varela Round (titles) + Atkinson Hyperlegible (text), files in `frontend/assets/fonts`.
 
+## Already done in this project (reuse)
+- `src/api.ts`: on web the API base is `window.location.origin` (frontend and API on the same host).
+- Sender: resolution `3840x1080` (USB stereo webcam) free for everyone (`isFreeRes` in `src/pro.ts`); preview limited to 45% of window height, viewer stage 55%, so controls stay visible on desktop/headset.
+- ShareCode: "Copy invite" fallback on desktop browsers without `navigator.share`.
+- An experimental Expo web export served by FastAPI at `/api/web` (`backend/web`, `frontend/scripts/build-web.sh`, `frontend/app.config.js`): NOT needed in the new web project — drop it.
+
 ## New for the web version
 - Wide desktop layout for the broadcaster (large camera preview, controls on the side).
 - Headset-friendly viewer page (big buttons, "Enter the 3D headset"), installable (PWA manifest + icon) so it can be pinned in the headset menu.
