@@ -156,10 +156,10 @@ const styles = StyleSheet.create({
   delConfirm: { width: 76, flexShrink: 0, backgroundColor: colors.error },
   delText: { fontFamily: fonts.bold, fontSize: 13, color: colors.onError },
   hint: { fontFamily: fonts.regular, fontSize: 14, color: colors.muted, lineHeight: 20 },
-  row: { flexDirection: "row", alignItems: "center", gap: spacing.md, backgroundColor: colors.surfaceSecondary, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, padding: spacing.md },
+  row: { flexDirection: "row", alignItems: "center", gap: spacing.sm, backgroundColor: colors.surfaceSecondary, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, padding: spacing.md },
   name: { fontFamily: fonts.bold, fontSize: 17, color: colors.onSurface },
   code: { fontFamily: fonts.regular, fontSize: 14, color: colors.muted, letterSpacing: 2 },
-  iconBtn: { width: 44, height: 44, borderRadius: radius.md, alignItems: "center", justifyContent: "center", backgroundColor: colors.surfaceTertiary },
-  call: { width: 44, height: 44, borderRadius: radius.md, alignItems: "center", justifyContent: "center", backgroundColor: colors.brandPrimary },
+  iconBtn: { width: 44, height: 44, flexShrink: 0, borderRadius: radius.md, alignItems: "center", justifyContent: "center", backgroundColor: colors.surfaceTertiary },
+  call: { width: 44, height: 44, flexShrink: 0, borderRadius: radius.md, alignItems: "center", justifyContent: "center", backgroundColor: colors.brandPrimary },
   pressed: { opacity: 0.8, transform: [{ scale: 0.96 }] },
 });

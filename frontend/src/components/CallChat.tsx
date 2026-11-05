@@ -1,6 +1,6 @@
 import { Feather } from "@react-native-vector-icons/feather";
-import { useEffect, useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { type NativeScrollEvent, type NativeSyntheticEvent, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import Animated, { FadeInUp, FadeOut } from "react-native-reanimated";
 
 import { Chip, ChipRow } from "@/src/components/ui";
@@ -75,7 +75,13 @@ export function ChatComposer({ onSend, testID, autoFocus }: { onSend: (t: string
 
 /** Card with the latest messages and the composer (normal, non-fullscreen view). */
 export function ChatPanel({ messages, onSend, testID }: { messages: ChatMessage[]; onSend: (t: string) => void; testID: string }) {
-  const last = messages.slice(-6);
+  const last = messages.slice(-50);
+  const ref = useRef<ScrollView>(null);
+  const atBottom = useRef(true);
+  const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+    atBottom.current = contentOffset.y + layoutMeasurement.height >= contentSize.height - 24;
+  };
   return (
     <View style={styles.panel} testID={testID}>
       <View style={styles.panelHead}>
@@ -85,11 +91,20 @@ export function ChatPanel({ messages, onSend, testID }: { messages: ChatMessage[
       {last.length === 0 ? (
         <Text style={styles.empty}>Nessun messaggio. Usa le risposte rapide per parlare senza interrompere il 3D.</Text>
       ) : (
-        <View style={styles.list}>
+        <ScrollView
+          ref={ref}
+          style={styles.scroll}
+          contentContainerStyle={styles.list}
+          nestedScrollEnabled
+          onScroll={onScroll}
+          scrollEventThrottle={64}
+          onContentSizeChange={() => atBottom.current && ref.current?.scrollToEnd({ animated: false })}
+          testID={`${testID}-list`}
+        >
           {last.map((m) => (
             <Bubble key={m.id} m={m} testID={`${testID}-msg-${m.from}`} />
           ))}
-        </View>
+        </ScrollView>
       )}
       <ChatComposer onSend={onSend} testID={`${testID}-composer`} />
     </View>
@@ -132,6 +147,7 @@ const styles = StyleSheet.create({
   panelHead: { flexDirection: "row", alignItems: "center", gap: spacing.sm, marginBottom: spacing.sm },
   panelTitle: { fontFamily: fonts.bold, fontSize: 16, color: colors.onSurface },
   empty: { fontFamily: fonts.regular, fontSize: 14, color: colors.muted, lineHeight: 20 },
+  scroll: { maxHeight: 240, marginBottom: spacing.sm },
   list: { gap: spacing.xs },
   bubble: { maxWidth: "85%", flexShrink: 1, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   me: { alignSelf: "flex-end", backgroundColor: colors.brandPrimary },

@@ -33,6 +33,11 @@ INDEXES: dict[str, list[IndexModel]] = {
         IndexModel([("code", ASCENDING)], name="code", unique=True),
         IndexModel([("updated_at", ASCENDING)], name="updated_at_ttl", expireAfterSeconds=120),
     ],
+    "reports": [
+        IndexModel([("reporter_device", ASCENDING), ("reported_device", ASCENDING)], name="pair", unique=True),
+        IndexModel([("reported_device", ASCENDING)], name="reported"),
+    ],
+    "suspended": [IndexModel([("device", ASCENDING)], name="device", unique=True)],
 }
 
 
@@ -65,6 +70,43 @@ STAGE_HTML = ROOT_DIR / "stage.html"
 
 
 # ---------- presence: "in attesa" status for codes the caller already knows ----------
+class ReportIn(BaseModel):
+    role: str = Field(pattern=r"^(sender|viewer)$")
+    reason: str = Field(pattern=r"^(molestie|sessuale|minore|spam|altro)$")
+    note: str = Field("", max_length=500)
+    reported_code: str = Field("", pattern=r"^(\d{6})?$")
+    reported_device: str = Field("", pattern=r"^([a-z0-9]{12,40})?$")
+    reporter_device: str = Field("", pattern=r"^([a-z0-9]{12,40})?$")
+
+
+SUSPEND_AFTER = 3  # distinct reporters
+
+
+@api_router.post("/reports")
+async def create_report(body: ReportIn, request: Request):
+    rate_limit(request, "reports", 5)
+    if not body.reported_device or not body.reporter_device or body.reported_device == body.reporter_device:
+        raise HTTPException(status_code=400, detail="Segnalazione non valida")
+    # one report per reporter/reported pair: the same person can't suspend someone alone
+    await db.reports.update_one(
+        {"reporter_device": body.reporter_device, "reported_device": body.reported_device},
+        {"$setOnInsert": {**body.model_dump(), "created_at": datetime.now(timezone.utc)}},
+        upsert=True,
+    )
+    n = len(await db.reports.distinct("reporter_device", {"reported_device": body.reported_device}))
+    if n >= SUSPEND_AFTER:
+        await db.suspended.update_one({"device": body.reported_device}, {"$setOnInsert": {"device": body.reported_device, "at": datetime.now(timezone.utc)}}, upsert=True)
+    return {"ok": True}
+
+
+@api_router.get("/suspended/{dev}")
+async def is_suspended(dev: str, request: Request):
+    rate_limit(request, "presence_r", 60)
+    if not re.fullmatch(r"[a-z0-9]{12,40}", dev):
+        return {"suspended": False}
+    return {"suspended": bool(await db.suspended.find_one({"device": dev}, {"_id": 1}))}
+
+
 class PresenceIn(BaseModel):
     code: str = Field(pattern=r"^\d{6}$")
     token: str = Field(pattern=r"^[A-Za-z0-9-]{16,64}$")  # random per viewer session, proves ownership of the code

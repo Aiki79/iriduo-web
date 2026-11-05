@@ -7,13 +7,13 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { GradientTitle } from "@/src/components/GradientTitle";
 import type { IconName } from "@/src/components/ui";
 import { greeting, TwoPeople } from "@/src/components/Warm";
 import { useProState } from "@/src/pro";
 import { colors, fonts, radius, spacing } from "@/src/theme";
 import { storage } from "@/src/utils/storage";
 
-const ONBOARDED_KEY = "onboarded"; // same key written by app/welcome.tsx
 
 function RoleCard({ title, text, icon, onPress, testID, delay, tint }: { title: string; text: string; icon: IconName; onPress: () => void; testID: string; delay: number; tint: string }) {
   return (
@@ -49,7 +49,7 @@ export default function Home() {
   const insets = useSafeAreaInsets();
   const { pro } = useProState();
   useEffect(() => {
-    storage.getItem(ONBOARDED_KEY, false).then((v) => {
+    storage.getItem("terms_v1", false).then((v) => {
       if (!v) router.replace("/welcome");
     });
   }, [router]);
@@ -67,9 +67,7 @@ export default function Home() {
               <Text style={styles.hello} testID="home-greeting">
                 {greeting()}!
               </Text>
-              <Text style={styles.title} testID="home-title">
-                IriDuo
-              </Text>
+              <GradientTitle style={styles.title} testID="home-title" />
               <Text style={styles.slogan} testID="home-slogan">
                 a tu per tu, in 3D
               </Text>

@@ -430,6 +430,50 @@ handlers.setView = c => { vista = c.value === 'split' ? 'split' : 'drag'; };
 handlers.showFile = c => { $('file').hidden = !c.on; $('hint').style.visibility = c.on ? 'hidden' : ''; };
 handlers.restart = () => location.reload();
 
+/* ===== Sicurezza: blocco, segnalazioni, registrazione solo con consenso ===== */
+const DEVICE = (() => {
+  let d = localStorage.getItem('device_id');
+  if (!/^[a-z0-9]{12,40}$/.test(d || '')) { const r = new Uint32Array(3); crypto.getRandomValues(r); d = Array.from(r, x => x.toString(36)).join('').slice(0, 24).padEnd(12, '0'); localStorage.setItem('device_id', d); }
+  return d;
+})();
+let bloccati = []; try { bloccati = JSON.parse(localStorage.getItem('bloccati') || '[]'); } catch {}
+const devDi = c => (c && c.metadata && /^[a-z0-9]{12,40}$/.test(String(c.metadata.dev || ''))) ? String(c.metadata.dev) : '';
+function canalePari(){ return MODE === 'sender' ? canaleS : (chiamataV ? canali[chiamataV.peer] : null); }
+function inviaPari(o){ const dc = canalePari(); if (dc && dc.open) { try { dc.send(o); return true; } catch {} } return false; }
+let attesaConsenso = null, devPari = '', sospeso = false;
+// sospensione automatica (3 segnalazioni da utenti diversi): controllata dal server, senza intervento manuale
+const eSospeso = dev => dev ? fetch('suspended/' + dev).then(r => r.ok ? r.json() : {}).then(j => !!j.suspended).catch(() => false) : Promise.resolve(false);
+eSospeso(DEVICE).then(v => { sospeso = v; if (v) { send({ type:'suspended' }); stato('Account sospeso per segnalazioni di altri utenti: non puoi fare né ricevere chiamate.'); } });
+function datiSicurezza(d){
+  if (!d) return;
+  if (d.t === 'hello' && /^[a-z0-9]{12,40}$/.test(String(d.dev || ''))) devPari = String(d.dev);
+  if (d.t === 'recAsk') send({ type:'recAsk' });
+  if (d.t === 'recAns') {
+    clearTimeout(attesaConsenso); attesaConsenso = null;
+    if (d.ok) avviaRec(); else send({ type:'recError', text:"L'altra persona non ha dato il consenso alla registrazione." });
+  }
+  if (d.t === 'recOn' || d.t === 'recOff') send({ type:'recPeer', on: d.t === 'recOn' });
+}
+handlers.recAnswer = c => { inviaPari({ t:'recAns', ok: !!c.ok }); };
+handlers.block = () => {
+  if (MODE === 'sender') return;
+  const dev = devDi(chiamataV || attesa);
+  if (dev && !bloccati.includes(dev)) { bloccati = [dev, ...bloccati].slice(0, 200); localStorage.setItem('bloccati', JSON.stringify(bloccati)); }
+  if (chiamataV) chiudiV(); else if (attesa) handlers.decline();
+  msgDopoCodice = 'Utente bloccato: non potrà più chiamarti. Ho creato anche un nuovo codice.';
+  rigeneraCodice();
+  send({ type:'blocked' });
+};
+handlers.unblockAll = () => { bloccati = []; localStorage.removeItem('bloccati'); };
+handlers.report = async c => {
+  const body = { role: MODE === 'sender' ? 'sender' : 'viewer', reason: String(c.reason || ''), note: String(c.note || '').slice(0, 500),
+    reported_code: MODE === 'sender' ? (codicePrimario || '') : '', reported_device: MODE === 'sender' ? devPari : devDi(chiamataV || attesa), reporter_device: DEVICE };
+  try {
+    const r = await fetch('reports', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify(body) });
+    send({ type:'reported', ok: r.ok });
+  } catch { send({ type:'reported', ok: false }); }
+};
+
 function avviaPeerVisore(){
   const rnd32 = new Uint32Array(1); crypto.getRandomValues(rnd32);
   const codice = codiceFisso || String(100000 + (rnd32[0] % 900000));
@@ -442,6 +486,7 @@ function avviaPeerVisore(){
   const questoPeer = peerV;
   peerV.on('disconnected', () => { if (peerV === questoPeer && !questoPeer.destroyed) questoPeer.reconnect(); });
   peerV.on('connection', dc => {
+    if (sospeso || bloccati.includes(devDi(dc))) { dc.close(); return; }   // bloccato: niente chat né contatti
     canali[dc.peer] = dc;
     dc.on('open', () => {
       if (rifiutiInSospeso.has(dc.peer)) { rifiutiInSospeso.delete(dc.peer); try { dc.send({ t:'decline' }); } catch {} }
@@ -450,6 +495,7 @@ function avviaPeerVisore(){
       if (d && d.t === 'cancel' && canali[dc.peer] === dc) annullata(dc.peer);
       if (d && d.t === 'chat' && chiamataV && chiamataV.peer === dc.peer) send({ type:'chat', text: String(d.text || '').slice(0, 300), from: /^\d{6}$/.test(String(d.from || '')) ? String(d.from) : undefined });
       if (d && d.t === 'react' && chiamataV && chiamataV.peer === dc.peer) reazioneRicevuta(String(d.kind));
+      if (chiamataV && chiamataV.peer === dc.peer) datiSicurezza(d);
     });
     dc.on('close', () => { if (canali[dc.peer] !== dc) return; delete canali[dc.peer]; annullata(dc.peer); });
   });
@@ -464,6 +510,8 @@ function avviaPeerVisore(){
       stato(msgDopoCodice);
       rigeneraCodice(); return;
     }
+    if (sospeso || bloccati.includes(devDi(c))) { c.close(); return; }   // utente bloccato o account sospeso
+    eSospeso(devDi(c)).then(v => { if (v && (attesa === c || chiamataV === c)) { if (chiamataV === c) chiudiV(); else { attesa.close(); attesa = null; send({ type:'ended' }); } stato('Chiamata rifiutata: l\'account che chiamava è sospeso.'); } });
     if (chiamataV || attesa) { c.close(); return; }
     attesa = c;
     send({ type:'incoming' });
@@ -497,6 +545,7 @@ handlers.answer = async () => {
   const c = attesa; attesa = null; chiamataV = c;
   fermaDemo();
   c.answer(micV || undefined);
+  setTimeout(() => { const dc = canali[c.peer]; if (dc && dc.open) try { dc.send({ t:'hello', dev: DEVICE }); } catch {} }, 500);
   const pcV = c.peerConnection;
   if (pcV) pcV.addEventListener('connectionstatechange', () => {
     if (chiamataV !== c) return;
@@ -615,6 +664,7 @@ function impostaBitrate(pc, bps){
 }
 
 handlers.call = async c => {
+  if (sospeso) { stato('Account sospeso per segnalazioni di altri utenti: non puoi fare chiamate.'); return; }
   const codice = String(c.code || '').trim();
   codicePrimario = codice;
   if (!/^\d{6}$/.test(codice)) { stato('Il codice deve avere 6 cifre.'); send({ type:'ended' }); return; }
@@ -649,13 +699,14 @@ handlers.call = async c => {
     }
     return;
   }
-  canaleS = peerS.connect(PREFISSO + codice);
+  canaleS = peerS.connect(PREFISSO + codice, { metadata: { dev: DEVICE } });
   canaleS.on('data', d => {
     if (d && d.t === 'decline') { stato('Chiamata rifiutata dal visore.'); fineS(); }
     if (d && d.t === 'chat' && chiamataS) { const text = String(d.text || '').slice(0, 300); send({ type:'chat', text, from: codicePrimario }); inoltra(canaleS, text, codicePrimario); }
     if (d && d.t === 'react' && chiamataS) reazioneRicevuta(String(d.kind));
+    if (chiamataS) datiSicurezza(d);
   });
-  chiamataS = peerS.call(PREFISSO + codice, streamLocale);
+  chiamataS = peerS.call(PREFISSO + codice, streamLocale, { metadata: { dev: DEVICE } });
   stato('Squilla: attendi che risponda dal visore.');
   timerSquillo = setTimeout(() => { if (chiamataS) { stato('Nessuna risposta dal visore.'); annullaS(); } }, 45000);
   const pc = chiamataS.peerConnection;
@@ -693,8 +744,8 @@ handlers.addGuest = c => {
   if (!chiamataS || !peerS || !streamLocale) { statoOspite(code, 'notLive'); return; }
   if (code === codicePrimario || ospiti[code]) { statoOspite(code, 'duplicate'); return; }
   if (Object.keys(ospiti).length >= MAX_OSPITI) { statoOspite(code, 'full'); return; }
-  const call = peerS.call(PREFISSO + code, streamLocale);
-  const dc = peerS.connect(PREFISSO + code);
+  const call = peerS.call(PREFISSO + code, streamLocale, { metadata: { dev: DEVICE } });
+  const dc = peerS.connect(PREFISSO + code, { metadata: { dev: DEVICE } });
   const o = { call, dc, state: 'ringing' };
   ospiti[code] = o;
   statoOspite(code, 'ringing');
@@ -878,6 +929,12 @@ function sceltaMime(){
   return '';
 }
 handlers.recStart = () => {
+  if (registratore || attesaConsenso) return;
+  if (!inviaPari({ t:'recAsk' })) { send({ type:'recError', text:'Registrazione possibile solo durante una chiamata, con il consenso dell\'altra persona.' }); return; }
+  send({ type:'recWaiting' });
+  attesaConsenso = setTimeout(() => { attesaConsenso = null; send({ type:'recError', text:"Nessuna risposta: la registrazione non è partita." }); }, 30000);
+};
+function avviaRec(){
   if (registratore) return;
   const stream = MODE === 'sender' ? streamLocale : (video && video.srcObject);
   if (!stream || !window.MediaRecorder) { send({ type:'recError', text:'Registrazione non disponibile su questo dispositivo.' }); return; }
@@ -890,8 +947,9 @@ handlers.recStart = () => {
   registratore.start(1000);
   timerMaxRec = setTimeout(fermaRec, 5 * 60 * 1000);
   send({ type:'recStarted' });
-};
-function fermaRec(){ clearTimeout(timerMaxRec); if (registratore && registratore.state !== 'inactive') registratore.stop(); }
+  inviaPari({ t:'recOn' });
+}
+function fermaRec(){ clearTimeout(timerMaxRec); if (registratore && registratore.state !== 'inactive') { registratore.stop(); inviaPari({ t:'recOff' }); } }
 handlers.recStop = fermaRec;
 const leggi64 = b => new Promise((ok, ko) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(',')[1] || ''); r.onerror = ko; r.readAsDataURL(b); });
 async function salvaRegistrazione(){

@@ -54,7 +54,7 @@ export function HeartBurst({ testID }: { testID?: string }) {
 }
 
 const styles = StyleSheet.create({
-  avatar: { alignItems: "center", justifyContent: "center" },
+  avatar: { alignItems: "center", justifyContent: "center", flexShrink: 0 },
   avatarText: { fontFamily: fonts.bold, color: colors.onBrandPrimary },
   burst: { ...StyleSheet.absoluteFill, alignItems: "center", justifyContent: "center", zIndex: 50 },
   burstText: { fontFamily: fonts.display, fontSize: 22, color: colors.onSurface, marginTop: 8, textShadowColor: colors.scrim, textShadowRadius: 8 },

@@ -17,6 +17,7 @@ import { ChatComposer, ChatPanel, ChatToasts, newMessage, type ChatMessage } fro
 import { ReactionBar } from "@/src/components/Reactions";
 import { FE_BASE, FisheyePanel, type Fisheye } from "@/src/components/FisheyePanel";
 import { HeartBurst } from "@/src/components/Warm";
+import { useSafety } from "@/src/components/Safety";
 import { FREE_REACTIONS, useProState } from "@/src/pro";
 import { ChunkReceiver, readMemoryBase64, saveAndShare, sendVideoFile } from "@/src/media";
 import { CallPill, CallStatsCard, formatDuration, quality, type CallStatsData } from "@/src/components/CallStats";
@@ -179,6 +180,9 @@ export default function Viewer() {
   );
 
   const react = useCallback((kind: string) => send({ type: "react", kind }), [send]);
+  const safety = useSafety("viewer", send);
+  const safetyEvent = useRef(safety.onEvent);
+  safetyEvent.current = safety.onEvent;
   const router = useRouter();
   const { pro } = useProState();
   const goPro = useCallback(() => {
@@ -190,6 +194,7 @@ export default function Viewer() {
 
   const onEvent = useCallback(
     (e: StageEvent) => {
+      if (safetyEvent.current(e)) return;
       switch (e.type) {
         case "xrSupport":
           setXrOk(e.on);
@@ -425,6 +430,7 @@ export default function Viewer() {
             <ShareCode code={code} />
           </View>
           <StatusBox testID="viewer-status" text={status} tone={phase === "error" ? "error" : phase === "connected" ? "success" : "info"} />
+          {safety.banner}
           {phase === "incoming" && (
             <Animated.View entering={FadeIn} style={styles.incoming} testID="viewer-incoming">
               <PulsingAnswer onPress={answer} />
@@ -523,7 +529,10 @@ export default function Viewer() {
           testID="viewer-controls"
         >
           {inCall && (
-            <Btn testID="viewer-hangup-button" label="Chiudi chiamata" icon="phone-off" variant="danger" onPress={() => send({ type: "hangup" })} style={styles.mt} />
+            <>
+              <Btn testID="viewer-hangup-button" label="Chiudi chiamata" icon="phone-off" variant="danger" onPress={() => send({ type: "hangup" })} style={styles.mt} />
+              {safety.ui}
+            </>
           )}
           {startedAt && phase === "connected" ? (
             <View style={styles.mt}>

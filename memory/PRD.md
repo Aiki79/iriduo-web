@@ -85,3 +85,14 @@
 - Tema: superfici indaco caldo, accento corallo (accent), radius più ampi, font titoli VarelaRound (fonts.display)
 - Home: saluto per ora del giorno, due persone animate (TwoPeople), card colorate (azzurro guardo / corallo trasmetto), menu con icone colorate
 - Avatar con iniziali colorate in rubrica; illustrazione nelle pagine vuote; vibrazione + cuore alla prima chiamata riuscita (viewer)
+
+## Jun 2026 - Sicurezza utenti
+- Benvenuto: dichiarazione 14+ e regole d'uso obbligatorie (chiave terms_v1)
+- In chiamata: Segnala (motivi + nota -> POST /api/reports) e Blocca (visore: blocca dispositivo + nuovo codice; mittente: blocca codice)
+- Registrazione solo con consenso dell'altro (recAsk/recAns), banner rosso 'sta registrando' per l'altro
+- Sospensione automatica: 3 segnalatori diversi -> db.suspended, GET /api/suspended/{dev}; nessun pannello admin. Età minima 14 (o permesso genitore); pagine /legal?doc=terms|privacy (bozze)
+
+## Update (giu 2026)
+- Titolo Home "IriDuo": Iri bianco + Duo sfumato azzurro→viola→rosso con alone e doppia ombra 3D (src/components/GradientTitle.tsx, MaskedView su nativo, background-clip su web)
+- Fix UI: chat con scroll interno che segue solo se sei in fondo, pannello ospiti e rubrica con pulsanti che non si schiacciano
+- Font: Varela Round (titoli), Atkinson Hyperlegible (testi)

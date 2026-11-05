@@ -18,6 +18,7 @@ import { addRecentCode, getRecentCodes } from "@/src/recent";
 import { getContacts, nameFor, type Contact } from "@/src/contacts";
 import { ChunkReceiver } from "@/src/media";
 import { GuestsPanel } from "@/src/components/GuestsPanel";
+import { blockedCodes, useSafety } from "@/src/components/Safety";
 import { callsLeft, countCall, FREE_REACTIONS, FREE_RESOLUTION, useProState } from "@/src/pro";
 import { colors, fonts, radius, spacing } from "@/src/theme";
 
@@ -177,6 +178,10 @@ function SenderBody() {
     setMessages((a) => [...a, m]);
     stage.current?.send({ type: "chat", text, id: m.id });
   }, []);
+  const sendStage = useCallback((c: { type: string; [k: string]: unknown }) => stage.current?.send(c), []);
+  const safety = useSafety("sender", sendStage, code);
+  const safetyEvent = useRef(safety.onEvent);
+  safetyEvent.current = safety.onEvent;
   const [floaters, setFloaters] = useState<FloatingReaction[]>([]);
   const removeFloater = useCallback((id: string) => setFloaters((a) => a.filter((f) => f.id !== id)), []);
   const addFloater = useCallback((kind: string) => setFloaters((a) => (a.length > 20 ? a : [...a, newReaction(kind)])), []);
@@ -265,6 +270,7 @@ function SenderBody() {
 
   const onEvent = useCallback(
     (e: StageEvent) => {
+      if (safetyEvent.current(e)) return;
       switch (e.type) {
         case "ready":
           sendConfig();
@@ -401,6 +407,11 @@ function SenderBody() {
       return;
     }
     if (target) setCode(target);
+    if ((await blockedCodes()).includes(c)) {
+      setStatus("Hai bloccato questo codice: non puoi chiamarlo.");
+      setTone("error");
+      return;
+    }
     if (callsLeft(proState) === 0) {
       router.push("/pro");
       return;
@@ -444,6 +455,7 @@ function SenderBody() {
         testID="sender-form"
       >
         <StatusBox testID="sender-status" text={status} tone={tone} />
+        {safety.banner}
         {phase === "live" && startedAt ? (
           <View style={styles.statsWrap}>
             <CallStatsCard startedAt={startedAt} stats={stats} direction="out" testID="sender-call-stats" />
@@ -495,6 +507,7 @@ function SenderBody() {
         ) : null}
         {phase === "live" ? (
           <View style={styles.statsWrap}>
+            {safety.ui}
             <Label>Reazioni</Label>
             <ReactionBar onReact={react} testID="sender-reactions" unlocked={pro ? undefined : FREE_REACTIONS} onLocked={() => router.push("/pro")} />
           </View>

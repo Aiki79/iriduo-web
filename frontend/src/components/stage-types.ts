@@ -32,6 +32,12 @@ export type StageEvent =
   | { type: "guest"; code: string; state: string }
   | { type: "fisheye"; value: Fisheye }
   | { type: "xrSupport"; on: boolean }
+  | { type: "recAsk" }
+  | { type: "recPeer"; on: boolean }
+  | { type: "recWaiting" }
+  | { type: "reported"; ok: boolean }
+  | { type: "blocked" }
+  | { type: "suspended" }
   | { type: "xr"; on: boolean };
 
 export type StageHandle = { send: (c: StageCmd) => void; reload: () => void };

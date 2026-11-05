@@ -1,0 +1,34 @@
+{
+  "summary": "Retest of iteration 27 safety issues 1, 2, 4 and 7, plus a quick regression, using real sender<->viewer calls at 375x667 with a separate browser context per role. All 4 fixes pass. BACKEND: 11/11 pytest pass (test_reports_safety.py, 2 new tests). Mongo has the indexes reports.pair (unique on reporter_device + reported_device), reports.reported, and suspended.device (unique). The same reporter twice counts once; 2 distinct reporters give suspended=false; 3 distinct give true. 8 parallel reports from the same pair all return 200 with no 500. A direct duplicate insert raises DuplicateKeyError. The 6th report in a minute returns 429. ISSUE 1: a suspended sender sees sender-suspended-banner ('Account sospeso: è stato segnalato da più utenti…') right after the screen loads, and it is still there 4s later. sender-status now stays 'Account sospeso…' and is no longer overwritten by 'Camera pronta'. A suspended viewer sees viewer-suspended-banner on load. A device that is not suspended shows no banner. ISSUE 4: after a viewer block, the call ends, viewer-safety-msg 'Utente bloccato: non potrà più chiamarti.' stays visible, and a new code is created. After a sender block, the call ends and sender-safety-msg 'Codice 250884 bloccato: non potrai più chiamarlo per errore.' stays visible. Calling that code again gives 'Hai bloccato questo codice: non puoi chiamarlo.' ISSUE 7: the welcome checkboxes have role=checkbox and aria-checked that changes correctly (false->true->false). The accept button is aria-disabled until both are ticked, and accept stores terms_v1 and goes to /. REGRESSION: a normal call connects on both sides. Recording consent: the viewer records (Pro), the sender sees sender-rec-consent, allow shows sender-peer-rec-banner and the viewer shows 'Ferma 00:02', and stop removes the banner. Report sheet: 5 reasons, and sending gives 'Segnalazione inviata. Grazie!'. Deprecated packages detected: none. SafeAreaView issues detected: none.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Viewer suspended state", "issue": "When the viewer is suspended, the banner shows, but viewer-status still says 'In attesa di chiamata.' and a shareable code (viewer-code + ShareCode) is shown. This is confusing because the account can't receive calls. Consider hiding or disabling the code and share actions, and setting the status to the suspended text (as the sender does).", "testID": "viewer-status", "priority": "LOW"},
+      {"component": "Sender suspended state", "issue": "sender-call-button stays enabled while suspended. Tapping it only shows the status text. Consider disabled={suspended}.", "testID": "sender-call-button", "priority": "LOW"},
+      {"component": "Safety msg persistence", "issue": "useSafety msg is never cleared (Safety.tsx:44). 'Segnalazione inviata' or 'Utente bloccato' stays under the status through all later calls in the same screen session. Consider clearing it when a new call starts or connects.", "testID": "sender-safety-msg", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "viewer (after block)", "issues": ["The message appears twice: viewer-status already says 'Utente bloccato: non potrà più chiamarti. Ho creato anche un nuovo codice.' and viewer-safety-msg repeats 'Utente bloccato: non potrà più chiamarti.' right below it."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_reports_safety.py", "/app/backend/tests/cleanup_safety_test_data.py", "/app/test_reports/pytest/pytest_safety_iter28.xml"],
+  "action_items": [
+    "LOW: viewer suspended state: set viewer-status to the suspended text and hide or disable the code and share actions.",
+    "LOW: disable sender-call-button while suspended.",
+    "LOW: clear the useSafety msg when a new call starts, and remove the duplicated 'Utente bloccato' text on the viewer.",
+    "Carry-over from iteration 27 (not retested): report abuse with made-up reporter ids, the Titolare placeholder in privacy, hangup bar overlapping scroll content, sender.tsx (704) and viewer.tsx (712) over 700 lines."
+  ],
+  "critical_code_review_comments": [
+    "server.py:91 upsert on (reporter_device, reported_device) is now backed by the unique 'pair' index. Concurrent duplicates return 200 (Mongo retries the upsert), so no DuplicateKeyError handling is needed.",
+    "sender.tsx is 704 lines and viewer.tsx is 712 lines, both still over the 700-line guideline."
+  ],
+  "updated_files": ["/app/backend/tests/test_reports_safety.py (added TestPairUniqueness: parallel same-pair reports, 2-distinct-not-suspended, unique index rejects duplicates)"],
+  "success_rate": {"backend": "100% (11/11)", "frontend": "100% of requested flows (Issues 1, 4, 7 and regression); 3 LOW UX notes"},
+  "seed_data_creation": "Created TEST_ reports making testdev11112222 (sender) and testdev33334444 (viewer) suspended, plus 1 UI report (testdev77770006 -> testdev77770005) and the pytest reports. All were removed with cleanup_safety_test_data.py. Final DB state: reports=0, suspended=0.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run pytest with: export EXPO_PUBLIC_BACKEND_URL from frontend/.env, then -n 0 (pytest.ini adds xdist flags). The recording button needs Pro: set localStorage pro_state = JSON.stringify(JSON.stringify({pro:true,plan:'yearly',month:'YYYY-MM',hdCalls:0})) in add_init_script. On the sender, use non-force clicks plus scroll_into_view_if_needed for the report and block buttons. Use force clicks on the viewer. Read viewer-code by polling until it is 6 digits.",
+  "rca_of_issue": ""
+}

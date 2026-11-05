@@ -1,7 +1,8 @@
+import type React from "react";
 import { Feather } from "@react-native-vector-icons/feather";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import Animated, { FadeInRight } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -10,6 +11,18 @@ import { colors, fonts, radius, spacing } from "@/src/theme";
 import { storage } from "@/src/utils/storage";
 
 const ONBOARDED_KEY = "onboarded";
+export const TERMS_KEY = "terms_v1"; // age (14+ or parent permission) + rules of use accepted
+
+const RULES = [
+  "Devi avere almeno 14 anni. Se hai meno di 14 anni, puoi usare IriDuo solo con il permesso di un genitore.",
+  "Puoi chiamare solo le persone che ti hanno dato il loro codice o link, e solo chi ha il tuo codice può chiamarti. Condividilo solo con chi conosci.",
+  "Vietato mostrare o condividere contenuti inappropriati (per esempio nudità, pornografia, violenza o attività illegali).",
+  "Vietati molestie, minacce, insulti, truffe e spam.",
+  "IriDuo non registra mai senza il tuo consenso: chiede sempre il permesso e mostra un avviso rosso. Ricorda però che chiunque potrebbe registrare lo schermo con altri strumenti.",
+  "Puoi bloccare e segnalare chi non rispetta le regole. Gli account segnalati da più utenti vengono sospesi automaticamente.",
+  "Se subisci un reato (minacce, ricatti, diffusione di immagini private), rivolgiti alla Polizia Postale: www.commissariatodips.it",
+  "Le videochiamate sono cifrate e non vengono registrate né visionate dal titolare dell'app.",
+];
 
 const STEPS: { icon: IconName; title: string; text: string }[] = [
   {
@@ -34,11 +47,44 @@ export default function Welcome() {
   const router = useRouter();
   const [step, setStep] = useState(0);
   const last = step === STEPS.length - 1;
+  const [terms, setTerms] = useState(false);
+  const [adult, setAdult] = useState(false);
+  const [rules, setRules] = useState(false);
 
-  const done = async () => {
+  const done = () => setTerms(true); // the app can only be entered after accepting the rules
+  const accept = async () => {
     await storage.setItem(ONBOARDED_KEY, true);
+    await storage.setItem(TERMS_KEY, true);
     router.replace("/");
   };
+
+  if (terms)
+    return (
+      <View style={[styles.root, { paddingTop: insets.top + spacing.lg, paddingBottom: insets.bottom + spacing.xl }]} testID="welcome-terms">
+        <ScrollView contentContainerStyle={styles.termsBody}>
+          <Text style={styles.title}>Prima di iniziare</Text>
+          <Text style={styles.text}>Leggi le regole d'uso di IriDuo:</Text>
+          {RULES.map((r, i) => (
+            <View key={i} style={styles.rule}>
+              <Feather name="check" size={18} color={colors.accent} />
+              <Text style={styles.ruleText}>{r}</Text>
+            </View>
+          ))}
+          <Check testID="welcome-adult-check" on={adult} onPress={() => setAdult(!adult)} label="Dichiaro di avere almeno 14 anni, oppure il permesso di un genitore" />
+          <Check testID="welcome-rules-check" on={rules} onPress={() => setRules(!rules)}>
+            Ho letto e accetto i{" "}
+            <Text style={styles.link} testID="welcome-terms-link" onPress={() => router.push({ pathname: "/legal", params: { doc: "terms" } })}>
+              Termini d'uso
+            </Text>{" "}
+            e l'
+            <Text style={styles.link} testID="welcome-privacy-link" onPress={() => router.push({ pathname: "/legal", params: { doc: "privacy" } })}>
+              Informativa privacy
+            </Text>
+          </Check>
+        </ScrollView>
+        <Btn testID="welcome-accept-button" label="Accetto ed entro" icon="check" variant="primary" disabled={!adult || !rules} onPress={accept} />
+      </View>
+    );
 
   const s = STEPS[step];
   return (
@@ -84,7 +130,24 @@ export default function Welcome() {
   );
 }
 
+function Check({ on, onPress, label, testID, children }: { on: boolean; onPress: () => void; label?: string; testID: string; children?: React.ReactNode }) {
+  return (
+    <Pressable testID={testID} accessibilityRole="checkbox" accessibilityState={{ checked: on }} aria-checked={on} onPress={onPress} style={styles.check}>
+      <View style={[styles.box, on && styles.boxOn]}>{on ? <Feather name="check" size={18} color={colors.onBrandPrimary} /> : null}</View>
+      <Text style={styles.checkText}>{children ?? label}</Text>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
+  termsBody: { gap: spacing.md, paddingBottom: spacing.xl },
+  rule: { flexDirection: "row", gap: spacing.sm },
+  ruleText: { flex: 1, fontFamily: fonts.regular, fontSize: 15, lineHeight: 22, color: colors.onSurface },
+  check: { flexDirection: "row", alignItems: "center", gap: spacing.md, minHeight: 52, marginTop: spacing.sm },
+  box: { width: 28, height: 28, borderRadius: radius.sm, borderWidth: 2, borderColor: colors.accent, alignItems: "center", justifyContent: "center" },
+  boxOn: { backgroundColor: colors.accent },
+  checkText: { flex: 1, fontFamily: fonts.regular, fontSize: 15, lineHeight: 22, color: colors.onSurface },
+  link: { color: colors.brandPrimary, textDecorationLine: "underline" },
   root: { flex: 1, backgroundColor: colors.surface, paddingHorizontal: spacing.xl },
   top: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   brand: { fontFamily: fonts.bold, fontSize: 13, letterSpacing: 1.6, color: colors.brandPrimary },
