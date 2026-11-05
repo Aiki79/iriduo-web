@@ -42,7 +42,8 @@ export type StageEvent =
 
 export type StageHandle = { send: (c: StageCmd) => void; reload: () => void };
 
+import { API_BASE } from "@/src/api";
 import { getLang } from "@/src/i18n";
 
-export const stageUrl = (mode: string, query?: string) => `${process.env.EXPO_PUBLIC_BACKEND_URL}/api/stage?mode=${mode}&lang=${getLang()}${query ? `&${query}` : ""}`;
-export const stageOrigin = () => new URL(String(process.env.EXPO_PUBLIC_BACKEND_URL)).origin;
+export const stageUrl = (mode: string, query?: string) => `${API_BASE}/api/stage?mode=${mode}&lang=${getLang()}${query ? `&${query}` : ""}`;
+export const stageOrigin = () => new URL(API_BASE).origin;

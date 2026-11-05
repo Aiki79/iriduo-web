@@ -19,6 +19,8 @@ export const FREE_HD_CALLS = 3;
 export const FREE_HISTORY = 3;
 export const FREE_REACTIONS = 3;
 export const FREE_RESOLUTION = "1920x960";
+/** Resolutions usable on the free plan: HD + the native mode of USB stereo webcams (3840×1080). */
+export const isFreeRes = (r: string) => r === FREE_RESOLUTION || r === "3840x1080";
 
 const KEY = "pro_state";
 const thisMonth = () => {

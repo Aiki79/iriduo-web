@@ -80,3 +80,5 @@ memory/test_credentials.md
 
 # Mobile development
 android-sdk/
+# Web build served by the backend at /api/web: its bundled font/icon assets must ship
+!/backend/web/assets/node_modules/

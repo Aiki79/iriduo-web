@@ -2,7 +2,7 @@ import { Feather } from "@react-native-vector-icons/feather";
 import { useCameraPermissions, useMicrophonePermissions } from "expo-camera";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Linking, Platform, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Linking, Platform, StyleSheet, Text, TextInput, useWindowDimensions, View } from "react-native";
 import { KeyboardAwareScrollView, KeyboardStickyView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -19,7 +19,8 @@ import { getContacts, nameFor, type Contact } from "@/src/contacts";
 import { ChunkReceiver } from "@/src/media";
 import { GuestsPanel } from "@/src/components/GuestsPanel";
 import { blockedCodes, useSafety } from "@/src/components/Safety";
-import { callsLeft, countCall, FREE_REACTIONS, FREE_RESOLUTION, useProState } from "@/src/pro";
+import { callsLeft, countCall, FREE_REACTIONS, FREE_RESOLUTION, isFreeRes, useProState } from "@/src/pro";
+import { API_BASE } from "@/src/api";
 import { tr, useLang } from "@/src/i18n";
 import { colors, fonts, radius, spacing } from "@/src/theme";
 
@@ -39,6 +40,7 @@ const GUEST_MSG = (s: string) =>
 const isWeb = Platform.OS === "web";
 const RESOLUTIONS = () => [
   { value: "3840x1920", label: tr("4K · consigliata", "4K · recommended") },
+  { value: "3840x1080", label: tr("3840×1080 · webcam stereo USB", "3840×1080 · USB stereo webcam") },
   { value: "2880x1440", label: "2,9K" },
   { value: "1920x960", label: tr("HD · rete lenta", "HD · slow network") },
 ];
@@ -123,9 +125,11 @@ function SenderBody() {
   const router = useRouter();
   const proState = useProState();
   const pro = proState.pro;
-  const [res, setRes] = useState("3840x1920");
+  // Wide screens (computer, headset browser): keep the preview from pushing the controls off-screen.
+  const { height: winH } = useWindowDimensions();
+  const [res, setRes] = useState(FREE_RESOLUTION);
   useEffect(() => {
-    if (proState.ready && !pro) setRes(FREE_RESOLUTION);
+    if (proState.ready) setRes((r) => (pro ? (r === FREE_RESOLUTION ? "3840x1920" : r) : isFreeRes(r) ? r : FREE_RESOLUTION));
   }, [pro, proState.ready]);
   const [bitrate, setBitrate] = useState(20000000);
   const [code, setCode] = useState("");
@@ -156,7 +160,7 @@ function SenderBody() {
     if (!pollCodes) return;
     let alive = true;
     const check = () =>
-      fetch(`${process.env.EXPO_PUBLIC_BACKEND_URL}/api/presence?codes=${pollCodes}`)
+      fetch(`${API_BASE}/api/presence?codes=${pollCodes}`)
         .then((r) => r.json())
         .then((j) => alive && setOnline(Array.isArray(j.online) ? j.online : []))
         .catch(() => {});
@@ -431,7 +435,7 @@ function SenderBody() {
 
   return (
     <View style={styles.flex}>
-      <View style={styles.preview} testID="sender-preview-container">
+      <View style={[styles.preview, { maxHeight: Math.round(winH * 0.45) }]} testID="sender-preview-container">
         <StageView ref={stage} mode="sender" onEvent={onEvent} testID="sender-preview" />
         {phase === "live" ? <ChatToasts messages={messages} testID="sender-chat-toasts" /> : null}
         {phase === "live" ? <FloatingReactions items={floaters} onDone={removeFloater} testID="sender-floating-reactions" /> : null}
@@ -567,7 +571,9 @@ function SenderBody() {
         <View style={[styles.warn]} testID="sender-camera-warning">
           <Feather name="alert-triangle" size={18} color={colors.warning} />
           <Text style={styles.warnText}>
-            {tr("La camera VR180 deve inviare l’immagine già unita (due metà affiancate). Collegala al telefono come webcam USB, oppure usa la fotocamera per una prova.", "The VR180 camera must send the image already joined (two halves side by side). Connect it to the phone as a USB webcam, or use the phone camera for a test.")}
+            {isWeb
+              ? tr("La camera VR180 o stereo deve inviare l’immagine già unita (due metà affiancate). Collegala al computer come webcam USB e sceglila qui sotto.", "The VR180 or stereo camera must send the image already joined (two halves side by side). Connect it to the computer as a USB webcam and pick it below.")
+              : tr("La camera VR180 deve inviare l’immagine già unita (due metà affiancate). Collegala al telefono come webcam USB, oppure usa la fotocamera per una prova.", "The VR180 camera must send the image already joined (two halves side by side). Connect it to the phone as a USB webcam, or use the phone camera for a test.")}
           </Text>
         </View>
 
@@ -592,10 +598,10 @@ function SenderBody() {
               <Chip
                 key={r.value}
                 testID={`sender-resolution-${r.value}`}
-                icon={!pro && r.value !== FREE_RESOLUTION ? "lock" : undefined}
-                label={!pro && r.value !== FREE_RESOLUTION ? `${r.label.split(" ·")[0]} · Pro` : r.label}
+                icon={!pro && !isFreeRes(r.value) ? "lock" : undefined}
+                label={!pro && !isFreeRes(r.value) ? `${r.label.split(" ·")[0]} · Pro` : r.label}
                 selected={res === r.value}
-                onPress={() => (!pro && r.value !== FREE_RESOLUTION ? router.push("/pro") : setRes(r.value))}
+                onPress={() => (!pro && !isFreeRes(r.value) ? router.push("/pro") : setRes(r.value))}
               />
             ))}
           </ChipRow>

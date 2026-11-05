@@ -1,0 +1,44 @@
+{
+  "summary": "Tested the /api/web static web build and the root preview. Backend: 45/45 pytest pass (new test_web_build.py, plus test_join_link and test_stage_api). Frontend: tested with Playwright on the public URL, using a separate Chromium launched with --use-fake-device-for-media-stream. PASS: (1) first launch /api/web/ -> /api/web/language -> welcome -> Home works. Deep routes /api/web/sender?code=123456 (code prefilled) and /api/web/viewer keep working after a reload. No 4xx responses. The 4 fonts load. No page errors. The only console errors are Cloudflare's injected beacon being blocked by the stage CSP (infrastructure). (2) The share link from the /api/web build has app=<origin>/api/web/. The join page sends the user to /api/web/sender?code=XXXXXX with the code prefilled. At the root preview it is app=<origin>/. Foreign and look-alike hosts fall back to frontend://. (3) Sender: camera and mic chips list the fake devices. On the FREE plan, 3840x1080 has no lock. Selecting it calls getUserMedia with ideal 3840x1080, and sender-resolution-text shows 'Actual resolution: 3840 × 1080'. 4K and 2,9K show the lock and '· Pro' and redirect to /api/web/pro. (4) Full call between two contexts on /api/web: the viewer shows its code, the sender enters it and calls, the viewer shows 'Incoming call.' and answers. Both connect, and stats show Video 3840 × 1080 on both sides. Hang-up works. (5) XR: with navigator.xr emulated, #vr in stage.html is shown ('Enter the 3D headset' / 'Entra nel visore 3D'). viewer-xr-note switches to 'Headset detected…'. A requestSession error is shown in viewer-status. Without XR the button stays hidden. The iframe allow attribute includes xr-spatial-tracking. (6) The root preview still works: Home, viewer, sender and 3840x1080. (7) Traversal attempts (../server.py, encoded variants) never return the source; they get 404 or the SPA index. FAIL (HIGH): on desktop and wide viewports the Sender form cannot be used. The 2:1 preview fills the screen, and the code input, camera chips, resolution chips and Call button area are squeezed to 4-84px under the fixed bottom bar. The desktop broadcast flow, which is the main goal, does not work at 1280x800, 1280x720 or 1920x1080. To verify the logic I had to use a 1280x1800 viewport.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/web/_expo/<missing>.js and /api/web/assets/<missing>", "issue": "Missing static files fall back to index.html with 200 text/html instead of 404. After a rebuild, a stale client asking for an old hashed chunk gets HTML parsed as JS, which causes a confusing SyntaxError. Fix: return 404 when path starts with _expo/ or assets/ (or has a file extension) and the file is missing. Reference: /app/backend/server.py:208-217"},
+      {"endpoint": "HEAD /api/web/", "issue": "Returns 405. Some link checkers and uptime probes use HEAD. Optional: add an @api_router.head route."},
+      {"endpoint": "Cache-Control on /api/web/_expo/*", "issue": "The app correctly sends 'public, max-age=31536000, immutable' (verified on :8001), but the preview ingress rewrites it to 'no-store, no-cache, must-revalidate'. This is infrastructure, not an app bug. Check it again after deploy."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Sender screen layout on desktop and landscape", "issue": "styles.preview uses aspectRatio:2 at full width, so on a 1280px-wide window the preview is 624px tall and on 1920px it is 944px. The KeyboardAwareScrollView form under it gets only 84px at 1280x800, 4px at 1280x720 and 44px at 1920x1080. The absolute bottom bar (89px) also covers that area. sender-code-input sits at y=811, below the viewport, and a click on sender-resolution-3840x1080 is intercepted by the bar's div. Users on a computer cannot enter the code, choose the camera or choose a resolution. Fix: cap the preview height on web and wide screens (e.g. maxHeight: '45%' / Math.min(width/2, height*0.45), alignSelf:'center'), or use a 2-column layout when width >= 900. Reference: /app/frontend/app/sender.tsx:436-462, 642-646", "testID": "sender-form", "priority": "HIGH"},
+      {"component": "Viewer on desktop and Meta Quest window", "issue": "The stage iframe is also 2:1 at full width (624px tall at 1280px). The in-stage 'Enter the 3D headset' button (bottom:16px of the iframe) ends up around y≈866, below the fold at 1280x720, so headset users have to scroll to find it. Cap the stage height the same way as the sender. Reference: app/viewer.tsx preview style, backend/stage.html:20", "testID": "viewer-xr-note", "priority": "MEDIUM"},
+      {"component": "Share 'More' button on desktop browsers", "issue": "navigator.share is undefined in desktop Chromium (and Firefox). Share.share throws, the error is swallowed, and pressing viewer-share-more-button does nothing, with no feedback. Add a fallback: navigator.clipboard.writeText(message) plus a 'Link copied' toast. Reference: /app/frontend/src/components/ShareCode.tsx:45-50", "testID": "viewer-share-more-button", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Sender", "issues": ["A free user first opens the camera at 3840x1920 (useState default), then again at 1920x960 once proState.ready. That is an extra getUserMedia restart on load. Initialize res to FREE_RESOLUTION, or wait for ready. Reference: app/sender.tsx:128-131"]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_web_build.py", "/app/test_reports/pytest/pytest_iter31.xml", "/app/test_reports/sender_desktop.jpg", "/app/test_reports/viewer_1280.jpg", "/app/test_reports/xr_en.jpg"],
+  "action_items": [
+    "HIGH: Fix the Sender layout for wide viewports so the form (code input, camera, mic and resolution chips) is visible above the bottom bar at 1280x720, 1280x800 and 1920x1080. Cap the preview height or use a side-by-side layout. Then rebuild /api/web with frontend/scripts/build-web.sh.",
+    "MEDIUM: Cap the viewer stage height on wide screens so the 'Enter the 3D headset' button is above the fold in the Meta Quest browser.",
+    "MEDIUM: Add a clipboard fallback for viewer-share-more-button when navigator.share is unavailable (desktop and Quest).",
+    "LOW: In web_app(), return 404 for missing _expo/ and assets/ files instead of the SPA index. Optionally support HEAD.",
+    "LOW: On the free plan, initialize the sender resolution to FREE_RESOLUTION to avoid a 4K getUserMedia on load."
+  ],
+  "critical_code_review_comments": [
+    "web_app() traversal guard (resolve + is_relative_to) is correct. Encoded ../ variants never leak files.",
+    "API_BASE = window.location.origin on web is correct for /api/web and preview. WEB_APP_BASE detection by pathname prefix works.",
+    "/api/join same-host check compares against https://{x-forwarded-host}. Look-alike host suffixes are rejected (tested).",
+    "sender.tsx is 712 lines, which is over the 700-line guideline. Consider extracting the device/resolution pickers into a component.",
+    "The stage CSP blocks the Cloudflare insights beacon that the CDN injects into /api/stage. It is harmless but adds console errors in the iframe."
+  ],
+  "updated_files": ["/app/backend/tests/test_web_build.py (new)"],
+  "success_rate": {"backend": "100% (45/45)", "frontend": "~80% (all functional flows pass; the desktop Sender layout blocks real desktop use)"},
+  "seed_data_creation": "None on the server. Only localStorage in throwaway browser contexts (lang_v1, terms_v1, onboarded). Presence entries for viewer codes created during tests expire via TTL.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Fake media: inside browser_automation, launch b2 = await page.context.browser.browser_type.launch(args=['--use-fake-device-for-media-stream','--use-fake-ui-for-media-stream']) and use new_context(permissions=['camera','microphone']). Seed localStorage in top frame only (window.top===window guard; the stage iframe denies sessionStorage). The Cloudflare beacon makes the HTML of each response different, so strip it before comparing. Screenshots from b2 pages must be saved to /app/test_reports/*.jpg and viewed with view_file. XR emulation: add_init_script that defines navigator.xr with isSessionSupported resolving true; the #vr button is inside frame_locator('iframe')."
+}

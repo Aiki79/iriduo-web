@@ -198,6 +198,28 @@ async def stage_lib(name: str):
     return FileResponse(LIB_DIR / name, media_type="application/javascript", headers={"Cache-Control": "public, max-age=86400"})
 
 
+# Web version of the app (Expo web export, built with baseUrl /api/web): open it on computers,
+# headsets and phones at https://<host>/api/web/. Rebuild with frontend/scripts/build-web.sh.
+WEB_DIR = (ROOT_DIR / "web").resolve()
+
+
+@api_router.api_route("/web", methods=["GET", "HEAD"], include_in_schema=False)
+@api_router.api_route("/web/{path:path}", methods=["GET", "HEAD"], include_in_schema=False)
+async def web_app(path: str = ""):
+    f = (WEB_DIR / path).resolve()
+    if path and f.is_file() and f.is_relative_to(WEB_DIR):
+        cache = "public, max-age=31536000, immutable" if path.startswith("_expo/") else "no-cache"
+        return FileResponse(f, headers={"Cache-Control": cache})
+    if path.startswith(("_expo/", "assets/")):
+        raise HTTPException(status_code=404)  # a missing bundle must not come back as the HTML page
+    index = WEB_DIR / "index.html"
+    if not index.is_file():
+        raise HTTPException(status_code=404, detail="Web build missing")
+    # Single-page app: every route (/api/web/sender, /api/web/viewer…) loads the same page.
+    return FileResponse(index, media_type="text/html", headers={"Cache-Control": "no-cache"})
+
+
+
 JOIN_HTML = (ROOT_DIR / "join.html").read_text(encoding="utf-8")
 EXPO_GO_HOST_SUFFIXES = (".emergentagent.com", ".emergent.host", ".emergent.sh")
 

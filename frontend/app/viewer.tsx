@@ -7,7 +7,7 @@ import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { storage } from "@/src/utils/storage";
-import { AppState, Linking, Platform, StyleSheet, Text, View } from "react-native";
+import { AppState, Linking, Platform, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { KeyboardAwareScrollView, KeyboardStickyView } from "react-native-keyboard-controller";
 import Animated, { FadeIn, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -25,6 +25,7 @@ import { addCall, topQuality } from "@/src/history";
 import { ShareCode } from "@/src/components/ShareCode";
 import type { StageEvent, StageHandle } from "@/src/components/stage-types";
 import { Btn, Chip, ChipRow, Header, IconBtn, Label, StatusBox, Toggle, type IconName } from "@/src/components/ui";
+import { API_BASE } from "@/src/api";
 import { tr, useLang } from "@/src/i18n";
 import { colors, fonts, radius, spacing } from "@/src/theme";
 
@@ -52,6 +53,7 @@ function PulsingAnswer({ onPress }: { onPress: () => void }) {
 export default function Viewer() {
   useLang();
   const demos = DEMOS();
+  const { height: winH } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const stage = useRef<StageHandle>(null);
   const { photo, video } = useLocalSearchParams<{ photo?: string; video?: string }>();
@@ -131,7 +133,7 @@ export default function Viewer() {
   }, []);
   useEffect(() => {
     if (!code || phase !== "waiting" || !appActive) return;
-    const base = `${process.env.EXPO_PUBLIC_BACKEND_URL}/api/presence`;
+    const base = `${API_BASE}/api/presence`;
     const token = presenceToken.current;
     const leave = () => fetch(`${base}/${code}?token=${token}`, { method: "DELETE", keepalive: true }).catch(() => {});
     const ping = () =>
@@ -459,7 +461,7 @@ export default function Viewer() {
       )}
 
       <View
-        style={full ? styles.stageFull : [styles.stageBox, { aspectRatio: view === "split" ? 2 : 16 / 9 }]}
+        style={full ? styles.stageFull : [styles.stageBox, { aspectRatio: view === "split" ? 2 : 16 / 9, maxHeight: Math.round(winH * 0.55) }]}
         testID="viewer-stage-container"
       >
         {fixedOn === null ? <View style={styles.flex} /> : <StageView ref={stage} mode="viewer" onEvent={onEvent} testID="viewer-stage" query={initQuery} />}

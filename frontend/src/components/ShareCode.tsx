@@ -1,8 +1,10 @@
 import { Feather } from "@react-native-vector-icons/feather";
 import * as ExpoLinking from "expo-linking";
+import { useState } from "react";
 import { Linking, Platform, Pressable, Share, StyleSheet, Text, View } from "react-native";
 
 import type { IconName } from "@/src/components/ui";
+import { API_BASE, WEB_APP_BASE } from "@/src/api";
 import { getLang, tr } from "@/src/i18n";
 import { colors, fonts, radius, spacing } from "@/src/theme";
 
@@ -10,7 +12,7 @@ const WHATSAPP_GREEN = "#25D366"; // brand color, identical in every theme
 const WHATSAPP_ON = "#0B2E17";
 
 const joinLink = (code: string) =>
-  `${process.env.EXPO_PUBLIC_BACKEND_URL}/api/join?code=${code}&lang=${getLang()}&app=${encodeURIComponent(ExpoLinking.createURL("/"))}`;
+  `${API_BASE}/api/join?code=${code}&lang=${getLang()}&app=${encodeURIComponent(WEB_APP_BASE ?? ExpoLinking.createURL("/"))}`;
 
 const message = (code: string) =>
   tr(
@@ -36,24 +38,45 @@ function ShareBtn({ label, icon, onPress, testID, bg, fg, border }: { label: str
 }
 
 export function ShareCode({ code }: { code: string | null }) {
+  const [copied, setCopied] = useState(false);
   if (!code) return null;
   const text = encodeURIComponent(message(code));
 
   const whatsapp = () => Linking.openURL(`https://wa.me/?text=${text}`).catch(() => {});
   const sms = () => Linking.openURL(Platform.OS === "ios" ? `sms:&body=${text}` : `sms:?body=${text}`).catch(() => {});
   const other = async () => {
+    // Desktop browsers have no share sheet: copy the invite instead.
+    if (Platform.OS === "web" && typeof navigator !== "undefined" && !navigator.share) {
+      try {
+        await navigator.clipboard.writeText(message(code));
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2500);
+      } catch {
+        /* clipboard blocked */
+      }
+      return;
+    }
     try {
       await Share.share({ message: message(code) });
     } catch {
       /* share sheet dismissed or unavailable */
     }
   };
+  const canShare = Platform.OS !== "web" || (typeof navigator !== "undefined" && !!navigator.share);
 
   return (
     <View style={styles.row} testID="viewer-share-row">
       <ShareBtn testID="viewer-share-whatsapp-button" label="WhatsApp" icon="message-circle" onPress={whatsapp} bg={WHATSAPP_GREEN} fg={WHATSAPP_ON} border={WHATSAPP_GREEN} />
       <ShareBtn testID="viewer-share-sms-button" label="SMS" icon="message-square" onPress={sms} bg={colors.surfaceTertiary} fg={colors.onSurface} border={colors.border} />
-      <ShareBtn testID="viewer-share-more-button" label={tr("Altro", "More")} icon="share-2" onPress={other} bg={colors.surfaceTertiary} fg={colors.onSurface} border={colors.border} />
+      <ShareBtn
+        testID="viewer-share-more-button"
+        label={copied ? tr("Copiato!", "Copied!") : canShare ? tr("Altro", "More") : tr("Copia invito", "Copy invite")}
+        icon={copied ? "check" : canShare ? "share-2" : "copy"}
+        onPress={other}
+        bg={colors.surfaceTertiary}
+        fg={colors.onSurface}
+        border={colors.border}
+      />
     </View>
   );
 }

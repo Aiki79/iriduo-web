@@ -103,3 +103,9 @@
 - stage.html gets ?lang=en (T() helper); join.html by browser language, link preview by sender lang
 - Quick replies localised on receive (CallChat localizeQuick)
 - Home: smaller grey greeting, single-language slogan, renamed cards, compact layout at narrow width/large text
+
+## Web version (giu 2026)
+- Expo web export built with baseUrl /api/web into backend/web (frontend/scripts/build-web.sh, app.config.js reads EXPO_WEB_BASE). Served by FastAPI /api/web (SPA fallback, 404 for missing _expo/assets).
+- REBUILD backend/web after every frontend change before publishing.
+- src/api.ts: on web API_BASE = window.location.origin.
+- 3840x1080 USB stereo webcam resolution, free plan. Desktop: preview max 45% height, viewer stage max 55%. Copy-invite fallback on desktop.
