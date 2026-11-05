@@ -17,6 +17,7 @@
   #file label{border:2px dashed #5CC8E0;border-radius:14px;padding:18px 22px;font-size:18px;font-weight:700;
     color:#5CC8E0;text-align:center;max-width:80%}
   #file input{display:none}
+  #vr{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:5;min-height:48px;padding:0 20px;border:0;border-radius:24px;white-space:nowrap;background:#22D3EE;color:#0E1A2B;font:700 16px sans-serif;box-shadow:0 4px 16px rgba(0,0,0,.4)}
   #guida{position:fixed;inset:0;width:100%;height:100%;display:block;background:#000;pointer-events:none}
 </style>
 </head>
@@ -25,6 +26,7 @@
 <video id="anteprima" autoplay muted playsinline hidden></video>
 <canvas id="guida" hidden></canvas>
 <div id="hint">In attesa del video…</div>
+<button id="vr" hidden>Entra nel visore 3D</button>
 <div id="file" hidden><label>Tocca qui per scegliere un video VR180<input type="file" id="fileProva" accept="video/*"></label></div>
 <audio id="audioRemoto" autoplay></audio>
 
@@ -107,11 +109,14 @@ const mostraMedia = on => { mediaAttivo = on; mesh.forEach(m => m.visible = on);
 
 function avviaVisore(){
   video = document.createElement('video');
+  video.hidden = true; document.body.appendChild(video);  // attaccato alla pagina: alcuni browser XR non aggiornano video staccati
   video.playsInline = true; video.setAttribute('playsinline', ''); video.crossOrigin = 'anonymous';
   video.addEventListener('playing', () => { hint(null); mostraMedia(true); });
   canvas = $('stage');
   renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.xr.enabled = true;                // Meta Quest & co.: vera visione stereo, un occhio per layer
+  renderer.xr.setReferenceSpaceType('local');
   scena = new THREE.Scene();
   scena.background = new THREE.Color(0x000000);
   camera = new THREE.PerspectiveCamera(75, 16/9, 0.1, 100);
@@ -124,6 +129,7 @@ function avviaVisore(){
   ridimensiona(); addEventListener('resize', ridimensiona);
   trascinamento(canvas);
   renderer.setAnimationLoop(disegna);
+  preparaVR();
   avviaPeerVisore();
 }
 
@@ -287,6 +293,10 @@ function ridimensiona(){ renderer.setSize(canvas.clientWidth, canvas.clientHeigh
 
 function disegna(){
   if (demo && demo !== 'foto') disegnaDemo(performance.now() / 1000);
+  if (renderer.xr.isPresenting) {           // nel visore: la camera XR mostra il layer 1 all'occhio sinistro e il 2 al destro
+    if (!demo && video.readyState >= 2) texture.needsUpdate = true;  // Quest Browser: il callback video può fermarsi in XR
+    animaReazioni(); renderer.render(scena, camera); return;
+  }
   if (guida) disegnaGuida();
   animaReazioni();
   const w = canvas.clientWidth, h = canvas.clientHeight;
@@ -308,6 +318,27 @@ function disegna(){
     renderer.setViewport(0, 0, w, h);
     renderer.render(scena, camera);
   }
+}
+
+/* WebXR: il pulsante compare solo se il browser supporta la realtà virtuale (es. Meta Quest Browser) */
+function preparaVR(){
+  const b = $('vr');
+  if (!navigator.xr || !navigator.xr.isSessionSupported) return;
+  navigator.xr.isSessionSupported('immersive-vr').then(ok => {
+    b.hidden = !ok;
+    send({ type: 'xrSupport', on: !!ok });
+  }).catch(() => {});
+  b.onclick = async () => {
+    try {
+      if (renderer.xr.isPresenting) { await renderer.xr.getSession().end(); return; }
+      if (video.paused && (video.srcObject || video.src)) video.play().catch(() => {});
+      const sess = await navigator.xr.requestSession('immersive-vr', { optionalFeatures: ['local-floor'] });
+      sess.addEventListener('end', () => { b.textContent = 'Entra nel visore 3D'; send({ type: 'xr', on: false }); });
+      await renderer.xr.setSession(sess);
+      b.textContent = 'Esci dal visore';
+      send({ type: 'xr', on: true });
+    } catch (e) { stato('Impossibile entrare nel visore: ' + (e && e.message || e)); }
+  };
 }
 
 function trascinamento(c){
@@ -344,7 +375,7 @@ handlers.setFisheye = c => { fe = pulisciFe(c.value); salvaFe(); costruisciSfere
 /* Guida calibrazione: mostra il fotogramma piatto con i cerchi calcolati, per allinearli a occhio */
 let guida = false;
 const guidaCanvas = document.getElementById('guida'), gctx = guidaCanvas.getContext('2d');
-handlers.feGuide = c => { guida = !!c.on; guidaCanvas.hidden = !guida; };
+handlers.feGuide = c => { guida = !!c.on; guidaCanvas.hidden = !guida; $('vr').style.visibility = guida ? 'hidden' : ''; };
 function disegnaGuida(){
   const src = demo === 'foto' || (demo && !video.videoWidth) ? demoCanvas : video;
   const W = src.videoWidth || src.width, H = src.videoHeight || src.height;

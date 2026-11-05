@@ -84,6 +84,7 @@ export default function Viewer() {
   }, [photo, video]);
   const [fe, setFe] = useState<Fisheye>(FE_BASE);
   const [guide, setGuide] = useState(false);
+  const [xrOk, setXrOk] = useState(false);
   useEffect(() => {
     if (format !== "fisheye" && guide) {
       setGuide(false);
@@ -180,6 +181,12 @@ export default function Viewer() {
   const onEvent = useCallback(
     (e: StageEvent) => {
       switch (e.type) {
+        case "xrSupport":
+          setXrOk(e.on);
+          break;
+        case "xr":
+          if (e.on) setFull(false); // the headset takes over the display
+          break;
         case "fisheye":
           setFe(e.value);
           break;
@@ -569,6 +576,11 @@ export default function Viewer() {
               <Btn compact testID="viewer-motion-settings-button" label="Apri Impostazioni" onPress={() => Linking.openSettings()} />
             </View>
           )}
+          <Text style={[styles.small, styles.mt]} testID="viewer-xr-note">
+            {xrOk
+              ? "Visore rilevato: tocca \"Entra nel visore 3D\" in basso nell'anteprima per vedere davvero in 3D."
+              : "Per il vero 3D su Meta Quest apri IriDuo nel browser del visore e tocca \"Entra nel visore 3D\". Qui sul telefono vedi un'anteprima piatta."}
+          </Text>
 
           <Label>Formato video</Label>
           <ChipRow testID="viewer-format-chips">

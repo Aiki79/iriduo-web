@@ -30,7 +30,9 @@ export type StageEvent =
   | { type: "recChunk"; i: number; n: number; data: string; name: string; mime: string }
   | { type: "codeTaken" }
   | { type: "guest"; code: string; state: string }
-  | { type: "fisheye"; value: Fisheye };
+  | { type: "fisheye"; value: Fisheye }
+  | { type: "xrSupport"; on: boolean }
+  | { type: "xr"; on: boolean };
 
 export type StageHandle = { send: (c: StageCmd) => void; reload: () => void };
 

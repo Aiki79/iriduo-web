@@ -1,0 +1,30 @@
+{
+  "summary": "Frontend-only retest of the WebXR follow-up fixes. Viewport 375x667 (plus 320px). Used the XR mock /app/tests/xr_mock_init.js and a real sender->viewer call with fake media. All 5 requested checks PASS and no page errors. (1) XR texture update: during a live call (1920x960 video, readyState 4) with video.requestVideoFrameCallback stubbed out, texture.version went up by exactly 1 per XR frame (68 frames -> +68). With rVFC stubbed and not in XR, the delta was 0, which proves the bump comes from the new XR branch. Without stubbing, the version went up about 1.57x per frame (rVFC + needsUpdate together). No frameError entries. In XR with no video (readyState 0) the version stayed at 0. In XR with the tunnel demo, the video texture stayed at 0 and only demoTex updated. (2) The stage <video> is now in document.body: hidden=true, display:none, placed after #guida. In the call it played (paused=false). Drag view and split view both rendered the video: readPixels gave green from the fake camera in both halves, and screenshots confirm it. (3) #vr has white-space:nowrap. At 375px it is 48px tall and 185px wide (one line). At 320px it is 48px tall with 1 client rect, so also one line. (4) With the mock, viewer-xr-note exactly matches 'Visore rilevato: tocca \"Entra nel visore 3D\" in basso nell'anteprima per vedere davvero in 3D.' Without the mock, #vr is hidden and the 'Per il vero 3D su Meta Quest…' note shows. (5) Regression: the sfere, tunnel and stelle demos render and stop-demo hides the meshes. Fisheye with stelle works. The fisheye guide shows #guida (display:block, position:fixed, after #stage in the DOM, video display:none so nothing covers it). The guide turns off when you switch back to sbs. Call connect, answer, hangup from the viewer and hangup from the sender all work on both ends. Entering and exiting XR during the call works.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/viewer stage preview with fisheye guide on (mock XR supported)", "issues": ["The #vr button (z-index:5, bottom-centre) sits on top of the fisheye calibration guide. It hides the lower part of the circles and the 'Occhio sinistro/destro' labels. Consider hiding #vr while guida is on (handlers.feGuide in stage.html:378). Only affects XR-capable browsers."]},
+      {"screen": "/viewer at 320px", "issues": ["The WhatsApp share button label is truncated to 'What…'. This is minor and was already there before this change."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/tests/xr_mock_init.js", "browser_automation scripts (inline, iteration 25)"],
+  "action_items": [
+    "LOW: hide the #vr button while the fisheye guide overlay is on, so it does not cover the calibration circles and labels.",
+    "LOW (pre-existing): the WhatsApp button label is truncated at 320px width.",
+    "Real-device verification on Meta Quest is still recommended. Headless tests cannot confirm Quest Browser video decoding inside an immersive session."
+  ],
+  "critical_code_review_comments": [
+    "stage.html:297: `if (!demo && video.readyState >= 2) texture.needsUpdate = true` is correct. It skips demo and photo modes (demo is truthy) and does not run before the video has data.",
+    "stage.html:112: the hidden video is appended in avviaVisore only, so sender mode is unaffected. Because it uses display:none, it does not interfere with the stacking of #stage, #guida or #vr.",
+    "stage.html:334: video.play() is called before requestSession without awaiting it, so user activation is kept for requestSession."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped)", "frontend": "100% (5/5 requested checks passed)"},
+  "seed_data_creation": "None. Short-lived presence codes were created by 2 viewer/sender test calls.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Use ctx.add_init_script for both localStorage onboarded=true and /app/tests/xr_mock_init.js. ctx.grant_permissions(['camera','microphone'], origin=BASE). Open the sender in ctx.new_page() at /sender, fill sender-code-input and click sender-call-button. On the viewer, click viewer-answer-button. To isolate the XR needsUpdate path, set video.requestVideoFrameCallback = () => 0 in the frame, then compare texture.version against __session.frames. Read pixels synchronously after calling disegna() in the same evaluate."
+}

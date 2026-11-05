@@ -1,0 +1,32 @@
+{
+  "summary": "Frontend-only test of the WebXR fix (stage.html + viewer). Viewport 375x667, localStorage onboarded=true. Real Quest hardware was not available, so I injected a full fake WebXR runtime into the stage iframe with add_init_script (/app/tests/xr_mock_init.js). It fakes navigator.xr, XRSession with a rAF loop, XRWebGLLayer, viewer pose with 2 views, and makeXRCompatible. All 6 requested checks PASS. (1) Stage loads with no page errors and renderer.xr.enabled === true. Mesh layers masks are [2,4]. (2) Plain Chromium: navigator.xr exists, isSessionSupported resolves false, so #vr stays hidden (display:none). viewer-xr-note shows 'Per il vero 3D su Meta Quest apri IriDuo nel browser del visore…'. (3) Mock supported: #vr is visible with text 'Entra nel visore 3D'. The app receives {type:'xrSupport',on:true} and the note switches to 'Visore rilevato…'. Clicking with requestSession rejected: the call was recorded as request:immersive-vr {optionalFeatures:['local-floor']}, status 'Impossibile entrare nel visore: mock denied' appeared in the app UI, there was no crash and the label stayed the same. Clicking with the fake session succeeded. three.js setSession completed and requested the reference space 'local'. isPresenting became true, the label became 'Esci dal visore' and {xr,on:true} was posted. Over 19 or more XR frames I saw no frame errors. Per-eye render check via onBeforeRender: the left XR camera (mask 3, viewport x=0) rendered only mesh 0 (layer 1). The right XR camera (mask 5, viewport x=170.5) rendered only mesh 1 (layer 2). So the stereo eye separation is correct. Exiting with the button ended the session: label reset, {xr,on:false} sent, flat rendering resumed (mesh0 with camera mask 2), canvas size and pixel ratio restored. A system-initiated session.end() also reset the label and sent on:false. Entering XR from app fullscreen set full=false without remounting the iframe (a window marker survived) and the session stayed alive. (4) Sender stage (?mode=sender): #vr stays hidden even with the mock reporting support, and isSessionSupported is never called. (5) The iframe allow attribute is 'camera; microphone; autoplay; fullscreen; xr-spatial-tracking'. (6) Regression: drag view renders only layer 1. Split view renders layer 1 and layer 2 in separate viewports. Fisheye format with the stelle demo works. The tunnel, stelle and sfere demos work and stop-demo hides the meshes. A real sender<->viewer call connected: 'Collegato: sei in chiamata 3D' / 'Collegato: sei in onda in 3D', 1920x960 video playing. Entering XR during the live call worked without errors, and hangup works on both ends. No page errors in any run.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/viewer stage preview (375px)", "issues": [
+        "The #vr button text 'Entra nel visore 3D' wraps onto 2 lines in the 341px preview. The button is 170px wide because left:50% leaves only half the width for shrink-to-fit. Add white-space:nowrap (or use left:0;right:0;margin:auto;width:max-content) in the #vr CSS at stage.html:20.",
+        "The viewer-xr-note copy says the button is 'sotto l'anteprima' (below the preview). It is actually inside the preview, at its bottom-centre. Reword to 'in basso nell'anteprima'."
+      ]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/tests/xr_mock_init.js (fake WebXR runtime for add_init_script)", "browser_automation scripts (inline, iteration 24)"],
+  "action_items": [
+    "MEDIUM (real-device risk, not reproducible in headless): in three r158, VideoTexture updates only through video.requestVideoFrameCallback. There are known reports of video textures freezing on the last frame in Quest/Chromium immersive sessions, because rVFC is tied to the window rendering loop (three.js forum 43068, WICG/video-rvfc#58). The stage video element is also created off-DOM. Suggested hardening in the disegna() XR branch: if (!demo && video.readyState >= 2) texture.needsUpdate = true; Optionally append the hidden video to the DOM and call video.play() on renderer.xr 'sessionstart'. Verify on a real Quest that the remote call video moves inside the headset.",
+    "LOW: add white-space:nowrap to #vr (stage.html:20) so the label stays on one line.",
+    "LOW: change the wording 'sotto l'anteprima' in viewer.tsx:581 to match where the button actually is."
+  ],
+  "critical_code_review_comments": [
+    "stage.html:295-297: the XR branch renders scena with the user camera. three r158 WebXRManager sub-cameras use default layer 0 plus layer 1 (left) / layer 2 (right), and do not inherit camera.layers. I verified at runtime that each eye sees only its own mesh.",
+    "stage.html:322-340: preparaVR runs only from avviaVisore, so sender mode is unaffected. When navigator.xr is absent, no xrSupport message is sent; the app defaults xrOk=false, which is fine. requestSession is called directly inside the click handler, so user activation is kept.",
+    "viewer.tsx:187-189: the 'xr' on:false event is ignored, which is fine. on:true exits fullscreen without remounting the iframe (verified)."
+  ],
+  "updated_files": ["/app/tests/xr_mock_init.js (new test helper only)"],
+  "success_rate": {"backend": "N/A (skipped)", "frontend": "100% (6/6 requested checks passed)"},
+  "seed_data_creation": "None. Short-lived presence codes were created by the viewer/sender call test.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Use wait_until='domcontentloaded' (networkidle never settles because of peerjs). Load the mock with page.add_init_script(path='/app/tests/xr_mock_init.js'). It only activates inside /api/stage frames, records parent-page postMessages in window.__msgs, and is controlled through window.__xrReject, window.__session and window.__xrCalls in the frame. Click the button inside the frame with fr.click('#vr'). Check per-eye rendering by setting mesh[i].onBeforeRender and recording cam.layers.mask. The incoming call needs viewer-answer-button."
+}

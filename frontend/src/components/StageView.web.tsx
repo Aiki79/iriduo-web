@@ -44,7 +44,7 @@ export function StageView({ mode, onEvent, ref, testID, query }: Props) {
         ref: frame,
         src: stageUrl(mode, query),
         title: "Scena VR180",
-        allow: "camera; microphone; autoplay; fullscreen",
+        allow: "camera; microphone; autoplay; fullscreen; xr-spatial-tracking",
         style: { border: 0, width: "100%", height: "100%", background: colors.stage, display: "block" },
       })}
     </View>

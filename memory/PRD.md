@@ -76,3 +76,7 @@
 ## Jun 2026 - Guida calibrazione + Profili camera
 - Pulsante 'Guida calibrazione' (viewer-fisheye-guide-button): stage mostra il fotogramma piatto con cerchi pieni (raggio), tratteggio 180°, croce al centro, orizzonte (handlers.feGuide, canvas #guida)
 - Profili camera (src/profiles.ts, CameraProfiles.tsx): salva/applica/elimina calibrazioni per nome, solo sul dispositivo (chiave fisheye_profiles), max 20, stesso nome = sovrascrive
+
+## Jun 2026 - WebXR (vero 3D su Meta Quest)
+- stage.html: renderer.xr.enabled, pulsante #vr 'Entra nel visore 3D' (solo se immersive-vr supportato), in XR render diretto (layer 1 occhio sx, 2 dx)
+- iframe allow xr-spatial-tracking; nota viewer-xr-note
