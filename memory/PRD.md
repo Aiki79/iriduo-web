@@ -67,3 +67,8 @@
 - Icona: ripristinata l'originale dell'utente
 
 - Icona: ridisegnata a 1024 dalla versione 192px dell'utente (due persone, visore a sinistra, 3D rosso/blu a destra) - scripts/draw_icon_v2.py
+
+## Jun 2026 - Fisheye ELP
+- Formato video 'Due cerchi fisheye affiancati (camera ELP)': stage.html uvFisheye (equidistante, sfere 128x64 per occhio, layer 1/2)
+- Cursori (FisheyePanel.tsx): centro X/Y ±150px, cerchio 70-130%, obiettivo 160-220° (187), occhio destro ±40px, Ripristina. Salvati solo in localStorage 'fisheye' dello stage, mai trasmessi
+- Foto in fisheye salvate con suffisso _FE

@@ -1,7 +1,7 @@
 import { Feather } from "@react-native-vector-icons/feather";
 import { useRouter } from "expo-router";
 import type { ComponentProps, ReactNode } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View, type StyleProp, type ViewStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { colors, fonts, radius, spacing } from "@/src/theme";
@@ -69,7 +69,8 @@ export function IconBtn({ icon, onPress, testID, label }: { icon: IconName; onPr
   );
 }
 
-export function Chip({ label, selected, onPress, testID, icon }: { label: string; selected: boolean; onPress: () => void; testID: string; icon?: IconName }) {
+export function Chip({ label, selected, onPress, testID, icon, wide }: { label: string; selected: boolean; onPress: () => void; testID: string; icon?: IconName; wide?: boolean }) {
+  const { width } = useWindowDimensions();
   return (
     <Pressable
       testID={testID}
@@ -78,12 +79,16 @@ export function Chip({ label, selected, onPress, testID, icon }: { label: string
       accessibilityState={{ selected }}
       style={({ pressed }) => [
         styles.chip,
+        wide && styles.chipWide,
         { backgroundColor: selected ? colors.brandPrimary : colors.surfaceSecondary, borderColor: selected ? colors.brandPrimary : colors.border },
         pressed && styles.pressed,
       ]}
     >
       {icon ? <Feather name={icon} size={16} color={selected ? colors.onBrandPrimary : colors.muted} /> : null}
-      <Text style={[styles.chipText, { color: selected ? colors.onBrandPrimary : colors.onSurfaceSecondary }]} numberOfLines={1}>
+      <Text
+        style={[styles.chipText, wide && { maxWidth: Math.min(400, width - 96) }, { color: selected ? colors.onBrandPrimary : colors.onSurfaceSecondary }]}
+        numberOfLines={wide ? 2 : 1}
+      >
         {label}
       </Text>
     </Pressable>
@@ -178,6 +183,7 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   chipText: { fontFamily: fonts.bold, fontSize: 15, maxWidth: 220 },
+  chipWide: { height: undefined, minHeight: 44, paddingVertical: 4 },
   label: { fontFamily: fonts.bold, fontSize: 14, color: colors.muted, marginTop: spacing.lg, marginBottom: spacing.xs, letterSpacing: 0.6, textTransform: "uppercase" },
   status: {
     backgroundColor: colors.surfaceSecondary,

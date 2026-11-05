@@ -1,0 +1,35 @@
+{
+  "summary": "Tested the fisheye (ELP dual-circle) viewer mode end to end. Found and fixed one bug: on a device with no saved values, pulisciFe(null) turned Number(null) into 0, which was then clamped to the minimums. The initial values were radius 70% and lens angle 160° instead of 100%/187°. After the fix everything requested works. Chip label is correct; the panel shows only for fisheye. The 5 sliders have the right defaults, ranges and labels. Moving a slider sends setFisheye to the stage, which saves it in localStorage 'fisheye' and rebuilds the spheres. Values come back after reload through the stage 'fisheye' event. Reset restores 0/0/100/187/0. Stage geometry is 8385 vertices = 129x65 (128x64 segments) on layers 1/2. UVs match the equidistant formula exactly (max error 3e-8). The front vertex maps to u=0.25/0.75, v=0.5; dx=100 shifts u by 100/3840; the right-eye offset shifts v only for the right half (20/1080). Image orientation is correct: right maps to u>cx, top to v≈1 with flipY. Swap exchanges the halves. Values outside the ranges are clamped. Regression: sbs and tb mappings are identical to before (error 6e-8). Generated demos in fisheye mode still use side-by-side mapping and render. A real call (fake camera, 1920x960) connects, and the fisheye mapping is recomputed from the actual video resolution (u range 0.0094..0.4906 = 462/1920 around 0.25). During the call, viewer data-channel sends were spied on and nothing was sent when a slider moved; the static check of all dc.send calls finds only decline/cancel/chat/react. Deprecated packages detected: none.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "stage.html pulisciFe", "issue": "FIXED: with no saved localStorage, Number(null)=0 was clamped to the minimums, so the initial values were raggio 70% and fov 160° instead of 100%/187°", "testID": "viewer-fisheye-raggio-value", "priority": "HIGH"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "viewer", "issues": [
+        "At 390px width the chip label 'Due cerchi fisheye affiancati (camera ELP)' is cut off ('Due cerchi fisheye affiancati…'); the ELP part is never visible. Consider letting the chip wrap or using a shorter label",
+        "On web the sliders don't respond to arrow keys (ArrowRight did not change the value). Minor accessibility issue"
+      ]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_fisheye_stage.py", "/app/test_reports/pytest/pytest_results_iter19.xml"],
+  "action_items": [
+    "Optional: save the chosen 'Formato video' locally (the user's reference saves localStorage 'formato'). Right now the viewer goes back to sbs on every reload or launch, so ELP users must re-select fisheye each time; the calibration itself is restored",
+    "Optional: make the fisheye chip label wrap or shorten it so '(camera ELP)' is visible on phones",
+    "Optional: throttle setFisheye; each slider tick rebuilds two 128x64 spheres and writes localStorage"
+  ],
+  "critical_code_review_comments": [
+    "uvFisheye and costruisciSfere match /tmp/ref.html exactly (R, cx, cy, theta, phi, 128x64 segments, scale(-1,1,1))",
+    "The right-eye alignment applies to the right image half (sorgente 1) even when swap is on. This matches the reference",
+    "The sender never receives fisheye values: the stage only posts {type:'fisheye'} to the parent RN app and never over PeerJS"
+  ],
+  "updated_files": ["/app/backend/stage.html (pulisciFe null-safe: `o && o[k] != null && o[k] !== '' ? Number(o[k]) : NaN`)", "/app/backend/tests/test_fisheye_stage.py (new)"],
+  "success_rate": {"backend": "100% (10/10)", "frontend": "100% after fix"},
+  "seed_data_creation": "none",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "The stage frame is found with page.frames where '/api/stage' is in url; mesh/fe/formato/handlers/canali are globals there. Sliders (@react-native-community/slider web) respond to page.mouse.click at a fraction of their bounding box. The call test works in a single browser context: viewer page + context.new_page() for /sender, fill sender-code-input, click sender-call-button, then viewer-answer-button. Note: viewer and sender share the same origin's localStorage in one context.",
+  "rca_of_issue": "pulisciFe(o) used Number(o && o[k]). When localStorage has no 'fisheye' entry, o=null, so the expression is Number(null)=0. That counts as finite, so it was clamped to FE_LIM minimums (raggio 70, fov 160). Reproduced by removing localStorage 'fisheye' and reloading /api/stage?mode=viewer: fe was {raggio:70,fov:160}. Fixed so that null, undefined or empty values fall back to FE_BASE; verified fe is {0,0,100,187,0} on a fresh device."
+}

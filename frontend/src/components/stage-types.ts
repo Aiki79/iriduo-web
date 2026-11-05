@@ -1,3 +1,5 @@
+import type { Fisheye } from "./FisheyePanel";
+
 export type StageCmd = { type: string; [k: string]: unknown };
 
 export type Device = { id: string; label: string };
@@ -27,7 +29,8 @@ export type StageEvent =
   | { type: "recSaved"; name: string; web?: boolean }
   | { type: "recChunk"; i: number; n: number; data: string; name: string; mime: string }
   | { type: "codeTaken" }
-  | { type: "guest"; code: string; state: string };
+  | { type: "guest"; code: string; state: string }
+  | { type: "fisheye"; value: Fisheye };
 
 export type StageHandle = { send: (c: StageCmd) => void; reload: () => void };
 

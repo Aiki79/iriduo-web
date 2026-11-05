@@ -1,0 +1,29 @@
+{
+  "summary": "Frontend-only test of the 3 fisheye follow-up fixes on /viewer at 390x844. All pass. (1) Format persistence: choosing fisheye writes localStorage viewer_format='\"fisheye\"' (a JSON string). After reload the fisheye panel is visible again and the stage formato is 'fisheye'. Choosing sbs, then reloading, hides the panel and sets stage 'sbs'. Choosing tb, then reloading, restores tb. (2) The fisheye chip sits on its own row and shows its full text 'Due cerchi fisheye affiancati (camera ELP)' at 390px (scrollWidth equals clientWidth at 304px; chip is 338px wide, x=16). (3) Sliders: at defaults the dx/dy/raggio/occhio thumbs sit at exactly 0.5 of the track, and fov at 0.453, which is correct for 187 in 160..220. Dragging dx to the far left gives '-150 px' and to the far right '150 px'. Clicking dy at 25% gives -80. occhio far left gives '-40 px' and far right '40 px'. raggio far left gives 70%. In every case the stage iframe's fe global and localStorage 'fisheye' equal the label values. Thumb positions match the values after a reload. Reset restores 0/0/100/187/0 in the UI and the stage, with thumbs back at centre. Regression: sbs/tb/fisheye chips switch the stage format. All 3 demos (sfere/tunnel/stelle) run in each format, and 'Ferma la demo' stops them. Deprecated packages detected: none in the files reviewed.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "viewer", "issues": [
+        "On narrow phones (<=360px wide) the fisheye chip (338px) is wider than the content area. It is clipped at the right edge of its horizontal ChipRow, so the user has to scroll to see '(camera ELP)'. It is not ellipsized. At 390px it fits fully. Optional: allow the wide chip to wrap onto 2 lines (numberOfLines={2}, height auto) or make it full width"
+      ]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Optional: let the 'wide' Chip wrap or fill the row width so the fisheye label is fully visible without scrolling on 320–360px devices"
+  ],
+  "critical_code_review_comments": [
+    "viewer.tsx:75-84: setFormat persists via storage.setItem. The restore effect is skipped when photo/video params are present, and the photo path uses setFormatState, so the saved preference is not overwritten. This is correct",
+    "The restore is async: if the stage 'ready' fires before getItem resolves, 'sbs' is sent first and the saved format follows via the format effect (line 311). This causes a brief rebuild but the result is correct",
+    "FisheyePanel 0..span offset mapping is correct. Math.round(v)+min keeps the emitted values within -150..150 / -40..40"
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped)", "frontend": "100%"},
+  "seed_data_creation": "none",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Set localStorage onboarded='true' and viewer_format=JSON.stringify('fisheye') to open the panel directly. Get the stage frame from page.frames where '/api/stage' is in the url; the globals fe, formato and demo are available there. Sliders respond to page.mouse drag/click on their bounding box. The thumb is the last square child div (width<40)."
+}

@@ -115,6 +115,9 @@ function avviaVisore(){
   camera = new THREE.PerspectiveCamera(75, 16/9, 0.1, 100);
   texture = new THREE.VideoTexture(video);
   texture.colorSpace = THREE.SRGBColorSpace;
+  // la mappatura fisheye dipende dalla risoluzione reale del video in arrivo
+  video.addEventListener('loadedmetadata', () => { if (formato === 'fisheye') costruisciSfere(); });
+  video.addEventListener('resize', () => { if (formato === 'fisheye') costruisciSfere(); });
   costruisciSfere();
   ridimensiona(); addEventListener('resize', ridimensiona);
   trascinamento(canvas);
@@ -135,8 +138,8 @@ function texAttuale(){ return demo ? demoTex : texture; }
 
 function preparaDemo(){
   if (!demoCanvas) demoCanvas = document.createElement('canvas');
-  demoCanvas.width = formato === 'sbs' ? 2048 : 1024;
-  demoCanvas.height = formato === 'sbs' ? 1024 : 2048;
+  demoCanvas.width = formato !== 'tb' ? 2048 : 1024;
+  demoCanvas.height = formato !== 'tb' ? 1024 : 2048;
   if (demoTex) demoTex.dispose();
   demoTex = new THREE.CanvasTexture(demoCanvas);
   demoTex.colorSpace = THREE.SRGBColorSpace;
@@ -192,7 +195,7 @@ function disegnaOcchio(ctx, w, h, t, s){
 
 function disegnaDemo(t){
   const ctx = demoCanvas.getContext('2d');
-  const W = demoCanvas.width, H = demoCanvas.height, sbs = formato === 'sbs';
+  const W = demoCanvas.width, H = demoCanvas.height, sbs = formato !== 'tb';
   const ew = sbs ? W / 2 : W, eh = sbs ? H : H / 2;
   for (const occhio of [0, 1]) {
     ctx.save();
@@ -222,17 +225,52 @@ handlers.stopDemo = () => {
   stato('In attesa di chiamata.');
 };
 
+/* Regolazioni fisheye: restano solo su questo visore (localStorage), non vengono trasmesse */
+const FE_BASE = { dx: 0, dy: 0, raggio: 100, fov: 187, occhio: 0 };
+const FE_LIM = { dx: [-150, 150], dy: [-150, 150], raggio: [70, 130], fov: [160, 220], occhio: [-40, 40] };
+let fe = { ...FE_BASE };
+function pulisciFe(o){
+  const out = { ...FE_BASE };
+  for (const k in FE_LIM) { const v = o && o[k] != null && o[k] !== '' ? Number(o[k]) : NaN; if (Number.isFinite(v)) out[k] = Math.max(FE_LIM[k][0], Math.min(FE_LIM[k][1], v)); }
+  return out;
+}
+try { fe = pulisciFe(JSON.parse(localStorage.getItem('fisheye') || 'null')); } catch {}
+function salvaFe(){ try { localStorage.setItem('fisheye', JSON.stringify(fe)); } catch {} }
+
+// Modello fisheye equidistante: distanza dal centro del cerchio proporzionale all'angolo dal davanti
+function uvFisheye(g, sorgente, W, H){
+  const uv = g.attributes.uv, pos = g.attributes.position;
+  const mezzo = W / 2;
+  const R = Math.min(mezzo, H) / 2 * fe.raggio / 100;              // raggio del cerchio (px)
+  const cx = (sorgente * mezzo + mezzo / 2 + fe.dx) / W;             // centro del cerchio (0..1)
+  const cy = 0.5 + (fe.dy + (sorgente === 1 ? fe.occhio : 0)) / H;
+  const angMax = fe.fov / 2 * Math.PI / 180;
+  for (let i = 0; i < uv.count; i++) {
+    const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+    const l = Math.hypot(x, y, z) || 1;
+    const theta = Math.acos(Math.max(-1, Math.min(1, -z / l)));      // angolo dal davanti (-Z)
+    const phi = Math.atan2(y, x);
+    const r = theta / angMax * R;
+    uv.setXY(i, cx + r * Math.cos(phi) / W, cy + r * Math.sin(phi) / H);
+  }
+}
+
 function costruisciSfere(){
   mesh.forEach(m => { scena.remove(m); m.geometry.dispose(); m.material.dispose(); });
   mesh = [];
+  // le demo generate sono sempre affiancate; le foto e il video usano la mappatura fisheye
+  const fish = formato === 'fisheye' && demo !== 'sfere' && demo !== 'tunnel' && demo !== 'stelle';
+  const W = demo === 'foto' ? demoCanvas.width : (video.videoWidth || 3840);
+  const H = demo === 'foto' ? demoCanvas.height : (video.videoHeight || 1080);
   for (const occhio of [0, 1]) {
-    const g = new THREE.SphereGeometry(10, 96, 48, Math.PI, Math.PI);
+    const g = fish ? new THREE.SphereGeometry(10, 128, 64, Math.PI, Math.PI) : new THREE.SphereGeometry(10, 96, 48, Math.PI, Math.PI);
     g.scale(-1, 1, 1);
     const uv = g.attributes.uv;
     const sorgente = scambia ? 1 - occhio : occhio;
-    for (let i = 0; i < uv.count; i++) {
+    if (fish) uvFisheye(g, sorgente, W, H);
+    else for (let i = 0; i < uv.count; i++) {
       let u = uv.getX(i), v = uv.getY(i);
-      if (formato === 'sbs') u = u * 0.5 + sorgente * 0.5;
+      if (formato !== 'tb') u = u * 0.5 + sorgente * 0.5;
       else v = v * 0.5 + (sorgente === 0 ? 0.5 : 0);
       uv.setXY(i, u, v);
     }
@@ -298,7 +336,9 @@ handlers.orient = c => {
 };
 handlers.setMotion = c => { moto = !!c.on; haOff = false; haDati = false; };
 handlers.recenter = () => { haOff = false; yaw = 0; pitch = 0; };
-handlers.setFormat = c => { formato = c.value === 'tb' ? 'tb' : 'sbs'; if (demo && demo !== 'foto') preparaDemo(); costruisciSfere(); };
+handlers.setFormat = c => { formato = ['tb', 'fisheye'].includes(c.value) ? c.value : 'sbs'; if (demo && demo !== 'foto') preparaDemo(); costruisciSfere(); };
+handlers.setFisheye = c => { fe = pulisciFe(c.value); salvaFe(); costruisciSfere(); };
+handlers.resetFisheye = () => { fe = { ...FE_BASE }; salvaFe(); costruisciSfere(); send({ type:'fisheye', value: fe }); };
 handlers.showImage = c => {
   if (chiamataV) { stato('Chiudi prima la chiamata per guardare una foto.'); return; }
   const img = new Image();
@@ -756,7 +796,7 @@ handlers.snapshot = () => {
   const k = Math.min(1, 4096 / w0);
   const c = document.createElement('canvas'); c.width = Math.round(w0 * k); c.height = Math.round(h0 * k);
   c.getContext('2d').drawImage(src, 0, 0, c.width, c.height);
-  const nome = 'VR180-foto-' + ora8() + (formato === 'sbs' ? '_SBS' : '_TB') + '.jpg';
+  const nome = 'VR180-foto-' + ora8() + ({ sbs: '_SBS', tb: '_TB', fisheye: '_FE' }[formato]) + '.jpg';
   const data = c.toDataURL('image/jpeg', 0.92);
   if (nativo) send({ type:'snapshot', name: nome, data: data.split(',')[1] });
   else { scarica(data, nome); send({ type:'snapshot', name: nome, web: true }); }
@@ -814,6 +854,7 @@ handlers.chat = c => {
 if (MODE === 'sender') { $('stage').hidden = true; avviaTrasmissione(); }
 else avviaVisore();
 send({ type:'ready', mode: MODE });
+if (MODE !== 'sender') send({ type:'fisheye', value: fe });
 </script>
 </body>
 </html>

@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StageView } from "@/src/components/StageView";
 import { ChatComposer, ChatPanel, ChatToasts, newMessage, type ChatMessage } from "@/src/components/CallChat";
 import { ReactionBar } from "@/src/components/Reactions";
+import { FE_BASE, FisheyePanel, type Fisheye } from "@/src/components/FisheyePanel";
 import { FREE_REACTIONS, useProState } from "@/src/pro";
 import { ChunkReceiver, readMemoryBase64, saveAndShare, sendVideoFile } from "@/src/media";
 import { CallPill, CallStatsCard, formatDuration, quality, type CallStatsData } from "@/src/components/CallStats";
@@ -69,7 +70,19 @@ export default function Viewer() {
   const [code, setCode] = useState<string | null>(null);
   const [status, setStatus] = useState("Collegamento al server…");
   const [phase, setPhase] = useState<Phase>("connecting");
-  const [format, setFormat] = useState<"sbs" | "tb">("sbs");
+  const [format, setFormatState] = useState<"sbs" | "tb" | "fisheye">("sbs");
+  // the chosen layout is remembered on this headset (the ELP user doesn't have to pick it every time)
+  const setFormat = useCallback((f: "sbs" | "tb" | "fisheye") => {
+    setFormatState(f);
+    storage.setItem("viewer_format", f);
+  }, []);
+  useEffect(() => {
+    if (photo || video) return; // saved photos/videos pick their own layout
+    storage.getItem("viewer_format", "sbs").then((f) => {
+      if (f === "sbs" || f === "tb" || f === "fisheye") setFormatState(f);
+    });
+  }, [photo, video]);
+  const [fe, setFe] = useState<Fisheye>(FE_BASE);
   const [swap, setSwap] = useState(false);
   const [view, setView] = useState<"drag" | "split">("drag");
   const [motion, setMotion] = useState(false);
@@ -160,6 +173,9 @@ export default function Viewer() {
   const onEvent = useCallback(
     (e: StageEvent) => {
       switch (e.type) {
+        case "fisheye":
+          setFe(e.value);
+          break;
         case "ready":
           send({ type: "setFormat", value: format });
           send({ type: "setSwap", on: swap });
@@ -174,9 +190,9 @@ export default function Viewer() {
           if (photo && !isWeb) {
             readMemoryBase64(photo)
               .then((data) => {
-                const f = /_TB\./.test(photo) ? "tb" : "sbs";
+                const f = /_TB\./.test(photo) ? "tb" : /_FE\./.test(photo) ? "fisheye" : "sbs";
                 send({ type: "setFormat", value: f });
-                setFormat(f);
+                setFormatState(f);
                 send({ type: "showImage", data, name: photo });
               })
               .catch(() => setMediaMsg({ text: "Non riesco ad aprire la foto.", tone: "error" }));
@@ -551,6 +567,19 @@ export default function Viewer() {
             <Chip testID="viewer-format-sbs-chip" label="Affiancate (VR180 standard)" selected={format === "sbs"} onPress={() => setFormat("sbs")} />
             <Chip testID="viewer-format-tb-chip" label="Una sopra l'altra" selected={format === "tb"} onPress={() => setFormat("tb")} />
           </ChipRow>
+          <ChipRow testID="viewer-format-fisheye-row">
+            <Chip wide testID="viewer-format-fisheye-chip" label="Due cerchi fisheye affiancati (camera ELP)" selected={format === "fisheye"} onPress={() => setFormat("fisheye")} />
+          </ChipRow>
+          {format === "fisheye" && (
+            <FisheyePanel
+              value={fe}
+              onChange={(v) => {
+                setFe(v);
+                send({ type: "setFisheye", value: v });
+              }}
+              onReset={() => send({ type: "resetFisheye" })}
+            />
+          )}
           <Toggle testID="viewer-swap-toggle" label="Scambia occhio sinistro e destro" value={swap} onChange={setSwap} />
 
           <Label>Prova senza chiamata</Label>
