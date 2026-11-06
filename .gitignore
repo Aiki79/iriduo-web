@@ -82,3 +82,9 @@ memory/test_credentials.md
 android-sdk/
 # Web build served by the backend at /api/web: its bundled font/icon assets must ship
 !/backend/web/assets/node_modules/
+.env
+.env.*
+*.env
+credentials.json
+*.key
+.credentials
